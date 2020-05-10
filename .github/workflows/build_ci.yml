@@ -25,6 +25,7 @@ jobs:
     - name: clone
       uses: actions/checkout@v2
       with:
+        token: ${{ secrets.BUILDBOT_PAT }}
         submodules: true
 
     - name: login to docker.pkg.github.com
