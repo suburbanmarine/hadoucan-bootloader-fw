@@ -10,9 +10,6 @@
 [submodule "external/mbedtls"]
 	path = external/mbedtls
 	url = git@bitbucket.org:suburbanmarine/mbedtls.git
-[submodule "external/bootloader_util"]
-	path = external/bootloader_util
-	url = git@bitbucket.org:jschloss_sm/bootloader_util.git
 [submodule "external/emb_fs_util"]
 	path = external/emb_fs_util
 	url = git@bitbucket.org:jschloss_sm/emb_fs_util.git
@@ -37,3 +34,6 @@
 [submodule "external/common_util"]
 	path = external/common_util
 	url = git@github.com:suburbanembedded/common_util.git
+[submodule "external/bootloader_util"]
+	path = external/bootloader_util
+	url = git@github.com:suburbanembedded/bootloader_util.git
