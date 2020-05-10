@@ -10,9 +10,6 @@
 [submodule "external/mbedtls"]
 	path = external/mbedtls
 	url = git@bitbucket.org:suburbanmarine/mbedtls.git
-[submodule "external/emb_fs_util"]
-	path = external/emb_fs_util
-	url = git@bitbucket.org:jschloss_sm/emb_fs_util.git
 [submodule "external/tinyxml2"]
 	path = external/tinyxml2
 	url = https://github.com/leethomason/tinyxml2.git
@@ -37,3 +34,6 @@
 [submodule "external/crc"]
 	path = external/crc
 	url = git@github.com:suburbanembedded/crc.git
+[submodule "external/emb_fs_util"]
+	path = external/emb_fs_util
+	url = git@github.com:suburbanembedded/emb_fs_util.git
