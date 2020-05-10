@@ -41,7 +41,7 @@ jobs:
       run: docker build --cache-from $DOCKER_REPO:master --cache-from $DOCKER_REPO:${GITHUB_REF##*/} continuous_integration/build --file continuous_integration/build/Dockerfile --tag hadoucan-bootloader-fw-tools
 
     - name: tag container
-      run: docker tag hadoucan-fw-tools $DOCKER_REPO:${GITHUB_REF##*/}
+      run: docker tag hadoucan-bootloader-fw-tools $DOCKER_REPO:${GITHUB_REF##*/}
 
     - name: push container
       run: docker push $DOCKER_REPO:${GITHUB_REF##*/}
