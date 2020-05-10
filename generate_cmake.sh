@@ -1,3 +1,7 @@
+#!/usr/bin/env bash
+
+trap 'exit -1' err
+
 if [ -d build ]; then rm -rf build; fi
 
 BASE_PATH=$PWD
@@ -29,7 +33,7 @@ pushd build/flash/relwithdebinfo
 cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo $TINYXML2_OPTS $MBEDTLS_OPTS $FLASH_TOOL $BASE_PATH
 popd
 
-mkdir -p build/flash/debug
-pushd build/flash/debug
-cmake -DCMAKE_BUILD_TYPE=Debug $TINYXML2_OPTS $MBEDTLS_OPTS $FLASH_TOOL $BASE_PATH
-popd
+# mkdir -p build/flash/debug
+# pushd build/flash/debug
+# cmake -DCMAKE_BUILD_TYPE=Debug $TINYXML2_OPTS $MBEDTLS_OPTS $FLASH_TOOL $BASE_PATH
+# popd
