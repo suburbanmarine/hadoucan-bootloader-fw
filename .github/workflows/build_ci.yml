@@ -25,7 +25,6 @@ jobs:
     - name: keys
       run: mkdir ~/.ssh && echo "${{ secrets.BUILDBOT_SSH_PRIV }}" > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
 
-    steps:
     - name: clone
       uses: actions/checkout@v2
       with:
