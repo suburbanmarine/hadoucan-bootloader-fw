@@ -38,7 +38,7 @@ jobs:
       run: docker pull $DOCKER_REPO:${GITHUB_REF##*/} || true
 
     - name: build container
-      run: docker build --cache-from $DOCKER_REPO:master --cache-from $DOCKER_REPO:${GITHUB_REF##*/} continuous_integration/build --file continuous_integration/build/Dockerfile --tag hadoucan-fw-tools
+      run: docker build --cache-from $DOCKER_REPO:master --cache-from $DOCKER_REPO:${GITHUB_REF##*/} continuous_integration/build --file continuous_integration/build/Dockerfile --tag hadoucan-bootloader-fw-tools
 
     - name: tag container
       run: docker tag hadoucan-fw-tools $DOCKER_REPO:${GITHUB_REF##*/}
@@ -53,13 +53,13 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: hadoucan-fw-debug
-        path: ${{ github.workspace }}/hadoucan-fw-debug-${{ github.sha }}.tar.gz
+        path: ${{ github.workspace }}/stm32h7_qspi_boot-debug-${{ github.sha }}.tar.gz
 
     - name: Upload release artifacts
       uses: actions/upload-artifact@v2
       with:
         name: hadoucan-fw-release
-        path: ${{ github.workspace }}/hadoucan-fw-release-${{ github.sha }}.tar.gz
+        path: ${{ github.workspace }}/stm32h7_qspi_boot-release-${{ github.sha }}.tar.gz
 
   release:
 
@@ -75,13 +75,13 @@ jobs:
       uses: actions/download-artifact@v2
       with:
         name: hadoucan-fw-release
-        path: ${{ github.workspace }}/hadoucan-fw-release-${{ github.sha }}.tar.gz
+        path: ${{ github.workspace }}/stm32h7_qspi_boot-release-${{ github.sha }}.tar.gz
 
     - name: Mangle name
-      run: mv hadoucan-fw-release-${{ github.sha }}.tar.gz hadoucan-fw-release-${{ github.sha }}-${{ github.event.ref }}.tar.gz
+      run: mv stm32h7_qspi_boot-release-${{ github.sha }}.tar.gz stm32h7_qspi_boot-release-${{ github.sha }}-${{ github.event.ref }}.tar.gz
 
     - name: Upload release artifacts
       uses: actions/upload-artifact@v2
       with:
-        name: hadoucan-fw-release
-        path: ${{ github.workspace }}/hadoucan-fw-release-${{ github.sha }}-${{ github.event.ref }}.tar.gz
+        name: stm32h7_qspi_boot-release
+        path: ${{ github.workspace }}/stm32h7_qspi_boot-release-${{ github.sha }}-${{ github.event.ref }}.tar.gz
