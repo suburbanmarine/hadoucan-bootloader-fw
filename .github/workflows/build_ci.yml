@@ -1,4 +1,4 @@
-name: Hadou-CAN CI
+name: Hadou-CAN Bootloader CI
 
 on: 
   create:
