@@ -55,7 +55,8 @@ void Bootloader_task::work()
 {
 	{
 		freertos_util::logging::Global_logger::set(&logging_task.get_logger());
-		freertos_util::logging::Global_logger::get()->set_sev_mask_level(freertos_util::logging::LOG_LEVEL::DEBUG);
+		freertos_util::logging::Global_logger::get()->set_sev_mask_level(LOG_LEVEL::INFO);
+		// freertos_util::logging::Global_logger::get()->set_sev_mask_level(LOG_LEVEL::DEBUG);
 	}
 
 	//start logging_task
@@ -64,6 +65,13 @@ void Bootloader_task::work()
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 	
 	logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "Started");
+
+	{
+		std::array<char, 25> id_str;
+		Bootloader_task::get_unique_id_str(&id_str);
+		logger->log(LOG_LEVEL::INFO, "Bootloader_task", "P/N: STM32H750 Bootloader");
+		logger->log(LOG_LEVEL::INFO, "Bootloader_task", "S/N: %s", id_str.data());
+	}
 
 	m_qspi.set_handle(&hqspi);
 
