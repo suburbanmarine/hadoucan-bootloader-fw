@@ -12,11 +12,10 @@
 #include "USB_tx_buffer_task.hpp"
 #include "USB_rx_buffer_task.hpp"
 
-#include "libusb_dev_cpp/usb_core.hpp"
-#include "libusb_dev_cpp/driver/usb_driver_base.hpp"
+#include "libusb_dev_cpp/core/usb_core.hpp"
 #include "libusb_dev_cpp/util/Descriptor_table.hpp"
 
-#include "../external/tinyxml2/tinyxml2.h"
+#include "tinyxml2/tinyxml2.h"
 
 class Bootloader_task : public Task_static<2048>
 {

@@ -2,14 +2,6 @@ cmake_minimum_required(VERSION 3.5)
 
 project(stm32h7_qspi_boot C CXX ASM)
 
-if(DEFINED ENV{ENC_BOOT_KEY})
-	
-	target_compile_definitions(stm32h7_qspi_boot
-		PRIVATE
-			-DENC_BOOT_KEY=$ENV{ENC_BOOT_KEY}
-	)
-endif()
-
 add_definitions(
 	-DSTM32H750xx
 	-D__weak=__attribute__\(\(weak\)\)
@@ -31,7 +23,8 @@ add_definitions(
 )
 
 include_directories(
-	${CMAKE_CURRENT_SOURCE_DIR}/include
+	include
+	external/
 	external/mbedtls/include
 )
 
@@ -56,8 +49,9 @@ add_library(spiffs
 	external/spiffs/src/spiffs_nucleus.c
 )
 
-target_include_directories(spiffs PUBLIC
-	external/spiffs/src
+target_include_directories(spiffs
+	PUBLIC
+		external/spiffs/src
 )
 
 add_executable(stm32h7_qspi_boot.elf
@@ -73,6 +67,7 @@ add_executable(stm32h7_qspi_boot.elf
 	
 	src/main.cpp
 	src/main_cube.c
+	src/global_inst.cpp
 	src/hal_inst.c
 	
 	src/tasks/USB_tx_buffer_task.cpp
@@ -90,6 +85,20 @@ add_executable(stm32h7_qspi_boot.elf
 	src/newlib_stubs.c
 
 	src/Fastboot.cpp
+)
+
+if(DEFINED ENV{ENC_BOOT_KEY})
+	
+	target_compile_definitions(stm32h7_qspi_boot.elf
+		PRIVATE
+			-DENC_BOOT_KEY=$ENV{ENC_BOOT_KEY}
+	)
+
+endif()
+
+target_include_directories(stm32h7_qspi_boot.elf
+	PRIVATE
+		include
 )
 
 target_link_libraries(stm32h7_qspi_boot.elf

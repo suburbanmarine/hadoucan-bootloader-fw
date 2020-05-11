@@ -1,6 +1,6 @@
 #pragma once
 
-#include "libusb_dev_cpp/usb_core.hpp"
+#include "libusb_dev_cpp/core/usb_core.hpp"
 
 #include "freertos_cpp_util/Task_static.hpp"
 

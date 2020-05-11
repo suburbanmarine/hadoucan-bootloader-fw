@@ -46,11 +46,6 @@ void DebugMon_Handler(void)
 
 }
 
-void OTG_HS_IRQHandler(void)
-{
-  
-}
-
 void QUADSPI_IRQHandler(void)
 {
   HAL_QSPI_IRQHandler(&hqspi);
