@@ -2,14 +2,15 @@
 
 #include "global_inst.hpp"
 
-#include "uart1_printf.hpp"
-
 #include "freertos_cpp_util/logging/Global_logger.hpp"
 
 #include "libusb_dev_cpp/class/cdc/cdc_notification.hpp"
 
+#include "hal_inst.h"
+#include "stm32h7xx_hal.h"
+
 // using freertos_util::logging::Global_logger;
-// using freertos_util::logging::LOG_LEVEL;
+using freertos_util::logging::LOG_LEVEL;
 
 namespace
 {

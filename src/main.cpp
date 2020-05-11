@@ -1,27 +1,21 @@
 #include "main.h"
 #include "cmsis_os.h"
 
-#include "uart1_printf.hpp"
+// #include "uart1_printf.hpp"
 
 #include "tasks/Bootloader_task.hpp"
 #include "tasks/LED_task.hpp"
 
 #include "freertos_cpp_util/Task_static.hpp"
+
 #include "common_util/Byte_util.hpp"
+#include "common_util/Stack_string.hpp"
 
 #include <array>
 #include <cinttypes>
 
 Bootloader_task    bootloader_task    __attribute__ (( section(".ram_dtcm_noload") ));
 LED_task           led_task           __attribute__ (( section(".ram_dtcm_noload") ));
-
-extern "C"
-{
-	void handle_config_assert(const char* file, const int line, const char* msg)
-	{
-		uart1_log<64>(LOG_LEVEL::FATAL, "freertos", "configASSERT in %s at %d, %s", file, line, msg);
-	}
-}
 
 void set_gpio_low_power(GPIO_TypeDef* const gpio)
 {
@@ -361,16 +355,16 @@ int main(void)
 	{
 		std::array<char, 25> id_str;
 		Bootloader_task::get_unique_id_str(&id_str);
-		uart1_log<64>(LOG_LEVEL::INFO, "main", "Initialing");
-		uart1_log<64>(LOG_LEVEL::INFO, "main", "P/N: STM32H750 Bootloader");
-		uart1_log<64>(LOG_LEVEL::INFO, "main", "S/N: %s", id_str.data());
+		// uart1_log<64>(LOG_LEVEL::INFO, "main", "Initialing");
+		// uart1_log<64>(LOG_LEVEL::INFO, "main", "P/N: STM32H750 Bootloader");
+		// uart1_log<64>(LOG_LEVEL::INFO, "main", "S/N: %s", id_str.data());
 	}
 
 
 	bootloader_task.launch("bootloader_task", 2);
 	led_task.launch("led", 1);
 
-	uart1_log<64>(LOG_LEVEL::INFO, "main", "Ready");
+	// uart1_log<64>(LOG_LEVEL::INFO, "main", "Ready");
 
 	vTaskStartScheduler();
 

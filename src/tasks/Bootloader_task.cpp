@@ -2,9 +2,12 @@
 
 #include "bootloader_aes_gcm_key.hpp"
 
-#include "uart1_printf.hpp"
+#include "freertos_cpp_util/logging/Global_logger.hpp"
 
 #include "global_inst.hpp"
+
+#include "hal_inst.h"
+#include "stm32h7xx_hal.h"
 
 #include "bootloader_util/Intel_hex_loader.hpp"
 #include "common_util/Byte_util.hpp"
@@ -29,6 +32,9 @@
 #include <mbedtls/md5.h>
 
 #include <cctype>
+#include <cinttypes>
+
+using freertos_util::logging::LOG_LEVEL;
 
 // USB_core         usb_core   __attribute__(( section(".ram_dtcm_noload") ));
 CDC_class        usb_cdc    __attribute__(( section(".ram_dtcm_noload") ));
@@ -55,13 +61,15 @@ void Bootloader_task::work()
 	//start logging_task
 	logging_task.launch("logging", 3);
 
-	uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "Started");
+	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
+	
+	logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "Started");
 
 	m_qspi.set_handle(&hqspi);
 
 	if(!m_qspi.init())
 	{
-		uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "m_qspi.init failed");
+		logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "m_qspi.init failed");
 
 		for(;;)
 		{
@@ -71,24 +79,24 @@ void Bootloader_task::work()
 
 	if(0)
 	{
-		uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "m_qspi.cmd_chip_erase start");
+		logger->log(LOG_LEVEL::INFO, "Bootloader_task", "m_qspi.cmd_chip_erase start");
 		if(!m_qspi.cmd_chip_erase())
 		{
-			uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "m_qspi.cmd_chip_erase failed");
+			logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "m_qspi.cmd_chip_erase failed");
 		}
 	}
 	
 	//verify BOR, RDP, JTAG
 	if(1)
 	{
-		uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Checking option byte");
+		logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Checking option byte");
 		if(!check_option_bytes())
 		{
-			uart1_log<128>(LOG_LEVEL::FATAL, "Bootloader_task", "Option bytes incorrect, flashing");
+			logger->log(LOG_LEVEL::FATAL, "Bootloader_task", "Option bytes incorrect, flashing");
 
 			if( (CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk) != 0)
 			{
-				uart1_log<128>(LOG_LEVEL::FATAL, "Bootloader_task", "JTAG attatched, cannot continue");
+				logger->log(LOG_LEVEL::FATAL, "Bootloader_task", "JTAG attatched, cannot continue");
 				for(;;)
 				{
 					vTaskSuspend(nullptr);
@@ -97,11 +105,11 @@ void Bootloader_task::work()
 
 			if(config_option_bytes())
 			{
-				uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Option bytes ok");
+				logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Option bytes ok");
 			}
 			else
 			{
-				uart1_log<128>(LOG_LEVEL::FATAL, "Bootloader_task", "Error writing option bytes");
+				logger->log(LOG_LEVEL::FATAL, "Bootloader_task", "Error writing option bytes");
 			}
 			
 			{
@@ -127,45 +135,45 @@ void Bootloader_task::work()
 		}
 		else
 		{
-			uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Option bytes ok");
+			logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Option bytes ok");
 		}
 	}
 	else
 	{
-		uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Skipping option byte check");
+		logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Skipping option byte check");
 	}
 
 	//check for software boot mode request
 	Bootloader_key boot_key;
 	{
-		uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Reading Boot Key");
+		logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Reading Boot Key");
 		boot_key.from_addr(reinterpret_cast<const uint8_t*>(0x38800000));
 
 		if(!boot_key.verify())
 		{
-			uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Boot Key invalid, clearing");
+			logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Boot Key invalid, clearing");
 			boot_key = clear_bootloader_key();
 		}
 		else
 		{
-			uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Bootloader Key OK");
+			logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Bootloader Key OK");
 		}
 
 		switch(boot_key.bootloader_op)
 		{
 			case uint8_t(Bootloader_key::Bootloader_ops::RUN_BOOTLDR):
 			{
-				uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Key: RUN_BOOTLDR");
+				logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Key: RUN_BOOTLDR");
 				break;
 			}
 			case uint8_t(Bootloader_key::Bootloader_ops::RUN_APP):
 			{
-				uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Key: RUN_APP");
+				logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Key: RUN_APP");
 				break;
 			}
 			default:
 			{
-				uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Key: unknown");
+				logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Key: unknown");
 				break;
 			}
 		}
@@ -197,7 +205,7 @@ void Bootloader_task::work()
 
 		if(ctr < 5)
 		{
-			uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "External request for RUN_BOOTLDR");
+			logger->log(LOG_LEVEL::INFO, "Bootloader_task", "External request for RUN_BOOTLDR");
 
 			boot_key.bootloader_op = uint8_t(Bootloader_key::Bootloader_ops::RUN_BOOTLDR);
 			boot_key.update_crc();
@@ -207,31 +215,31 @@ void Bootloader_task::work()
 	m_fs.initialize();
 	m_fs.set_flash(&m_qspi);
 
-	uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Mounting flash fs");
+	logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Mounting flash fs");
 	int mount_ret = m_fs.mount();
 	if(mount_ret != SPIFFS_OK)
 	{
-		uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "Flash mount failed: %d", mount_ret);
-		uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "You will need to reload the firmware");
+		logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "Flash mount failed: %d", mount_ret);
+		logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "You will need to reload the firmware");
 
-		uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Format flash");
+		logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Format flash");
 		int format_ret = m_fs.format();
 		if(format_ret != SPIFFS_OK)
 		{
-			uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "Flash format failed: %d", format_ret);
-			uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "Try a power cycle, your board may be broken");
+			logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "Flash format failed: %d", format_ret);
+			logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "Try a power cycle, your board may be broken");
 			for(;;)
 			{
 				vTaskSuspend(nullptr);
 			}
 		}
 
-		uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Mounting flash fs");
+		logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Mounting flash fs");
 		mount_ret = m_fs.mount();
 		if(mount_ret != SPIFFS_OK)
 		{
-			uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "Flash mount failed right after we formatted it: %d", mount_ret);
-			uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "Try a power cycle, your board may be broken");
+			logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "Flash mount failed right after we formatted it: %d", mount_ret);
+			logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "Try a power cycle, your board may be broken");
 			for(;;)
 			{
 				vTaskSuspend(nullptr);
@@ -239,20 +247,20 @@ void Bootloader_task::work()
 		}
 	}
 
-	uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Flash mount ok");
+	logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Flash mount ok");
 
 	switch(boot_key.bootloader_op)
 	{
 		case uint8_t(Bootloader_key::Bootloader_ops::RUN_BOOTLDR):
 		{
-			uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Bootloader requested");
+			logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Bootloader requested");
 			break;
 		}
 		case uint8_t(Bootloader_key::Bootloader_ops::RUN_APP):
 		{
-			uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "App load requested");
+			logger->log(LOG_LEVEL::INFO, "Bootloader_task", "App load requested");
 
-			uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Looking for bin gcm file");
+			logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Looking for bin gcm file");
 			if(load_verify_bin_gcm_app_image())
 			{
 				for(;;)
@@ -262,7 +270,7 @@ void Bootloader_task::work()
 			}
 			else
 			{
-				uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Looking for hex file");
+				logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Looking for hex file");
 				if(load_verify_hex_app_image())
 				{
 					for(;;)
@@ -272,7 +280,7 @@ void Bootloader_task::work()
 				}
 				else 
 				{
-					uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Looking for bin file");
+					logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Looking for bin file");
 					if(load_verify_bin_app_image())
 					{
 						for(;;)
@@ -282,7 +290,7 @@ void Bootloader_task::work()
 					}
 					else
 					{
-						uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "App load failed, staying in bootloader mode");
+						logger->log(LOG_LEVEL::INFO, "Bootloader_task", "App load failed, staying in bootloader mode");
 					}
 				}
 			}
@@ -291,12 +299,12 @@ void Bootloader_task::work()
 		}
 		default:
 		{
-			uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Invalid boot key");
+			logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Invalid boot key");
 			break;
 		}
 	}
 
-	uart1_log<128>(LOG_LEVEL::INFO, "Bootloader_task", "Starting usb");
+	logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Starting usb");
 	init_usb();
 
 	m_fastboot.set_download_buffer(reinterpret_cast<uint8_t*>(0x24000000), 512*1024*1024);
@@ -368,11 +376,13 @@ void Bootloader_task::work()
 
 bool Bootloader_task::load_verify_hex_app_image()
 {
+	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
+
 	const char* fname = "app.hex";
 	int fd = SPIFFS_open(m_fs.get_fs(), fname, SPIFFS_RDONLY, 0);
 	if(fd < 0)
 	{
-		uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "Opening file %s failed: %" PRId32, fname, SPIFFS_errno(m_fs.get_fs()));
+		logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "Opening file %s failed: %" PRId32, fname, SPIFFS_errno(m_fs.get_fs()));
 		return false;
 	}
 
@@ -423,7 +433,7 @@ bool Bootloader_task::load_verify_hex_app_image()
 
 			if(!hex_loader.process_line(line_buffer))
 			{
-				uart1_log<256>(LOG_LEVEL::ERROR, "Bootloader_task", "hex_loader.process_line failed: %s", line_buffer.c_str());
+				logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "hex_loader.process_line failed: %s", line_buffer.c_str());
 				break;
 			}
 
@@ -433,10 +443,10 @@ bool Bootloader_task::load_verify_hex_app_image()
 	s32_t close_ret = SPIFFS_close(m_fs.get_fs(), fd);
 	if(close_ret != SPIFFS_OK)
 	{
-		uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "close file %s failed: %" PRId32, fname, SPIFFS_errno(m_fs.get_fs()));
+		logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "close file %s failed: %" PRId32, fname, SPIFFS_errno(m_fs.get_fs()));
 	}
 
-	uart1_log<64>(LOG_LEVEL::INFO, "Bootloader_task", "File loaded");
+	logger->log(LOG_LEVEL::INFO, "Bootloader_task", "File loaded");
 
 	std::array<unsigned char, 16> md5_output;
 	mbedtls_md5_finish_ret(&md5_ctx, md5_output.data() );
@@ -448,19 +458,19 @@ bool Bootloader_task::load_verify_hex_app_image()
 	{
 		Byte_util::u8_to_hex(md5_output[i], md5_output_hex.data() + 2*i);
 	}
-	uart1_log<96>(LOG_LEVEL::DEBUG, "Bootloader_task", "File checksum: %s", md5_output_hex.data());
+	logger->log(LOG_LEVEL::DEBUG, "Bootloader_task", "File checksum: %s", md5_output_hex.data());
 
 	if(hex_loader.has_eof())
 	{
 		uint32_t boot_addr = 0;
 		if(!hex_loader.get_boot_addr(&boot_addr))
 		{
-			uart1_log<64>(LOG_LEVEL::ERROR, "Bootloader_task", "Got EOF, but no boot addr");
+			logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "Got EOF, but no boot addr");
 			return false;
 		}
 
-		uart1_log<64>(LOG_LEVEL::DEBUG, "Bootloader_task", "Got EOF, boot addr: 0x%08" PRIX32 ", estack: %08" PRIX32, boot_addr, 0);
-		uart1_log<64>(LOG_LEVEL::INFO, "Bootloader_task", "Jumping to application...");
+		logger->log(LOG_LEVEL::DEBUG, "Bootloader_task", "Got EOF, boot addr: 0x%08" PRIX32 ", estack: %08" PRIX32, boot_addr, 0);
+		logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Jumping to application...");
 
 		jump_to_addr(0, boot_addr);
 
@@ -472,7 +482,7 @@ bool Bootloader_task::load_verify_hex_app_image()
 	}
 	else
 	{
-		uart1_log<64>(LOG_LEVEL::ERROR, "Bootloader_task", "No EOF in boot record");
+		logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "No EOF in boot record");
 		return false;
 	}
 
@@ -481,12 +491,14 @@ bool Bootloader_task::load_verify_hex_app_image()
 
 bool Bootloader_task::load_verify_bin_app_image()
 {
+	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
+
 	const char* fname = "app.bin";
 
 	int fd = SPIFFS_open(m_fs.get_fs(), fname, SPIFFS_RDONLY, 0);
 	if(fd < 0)
 	{
-		uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "Opening file %s failed: %" PRId32, fname, SPIFFS_errno(m_fs.get_fs()));
+		logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "Opening file %s failed: %" PRId32, fname, SPIFFS_errno(m_fs.get_fs()));
 		return false;
 	}
 
@@ -521,10 +533,10 @@ bool Bootloader_task::load_verify_bin_app_image()
 	s32_t close_ret = SPIFFS_close(m_fs.get_fs(), fd);
 	if(close_ret != SPIFFS_OK)
 	{
-		uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "close file %s failed: %" PRId32, fname, SPIFFS_errno(m_fs.get_fs()));
+		logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "close file %s failed: %" PRId32, fname, SPIFFS_errno(m_fs.get_fs()));
 	}
 
-	uart1_log<64>(LOG_LEVEL::INFO, "Bootloader_task", "File loaded");
+	logger->log(LOG_LEVEL::INFO, "Bootloader_task", "File loaded");
 
 	std::array<unsigned char, 16> md5_output;
 	mbedtls_md5_finish_ret(&md5_ctx, md5_output.data() );
@@ -536,7 +548,7 @@ bool Bootloader_task::load_verify_bin_app_image()
 	{
 		Byte_util::u8_to_hex(md5_output[i], md5_output_hex.data() + 2*i);
 	}
-	uart1_log<96>(LOG_LEVEL::DEBUG, "Bootloader_task", "File checksum: %s", md5_output_hex.data());
+	logger->log(LOG_LEVEL::DEBUG, "Bootloader_task", "File checksum: %s", md5_output_hex.data());
 
 	uint32_t app_estack = 0;
 	uint32_t app_reset_handler = 0;
@@ -544,8 +556,8 @@ bool Bootloader_task::load_verify_bin_app_image()
 	std::copy_n(axi_base, sizeof(app_estack), reinterpret_cast<uint8_t*>(&app_estack));
 	std::copy_n(axi_base + sizeof(app_estack), sizeof(app_reset_handler), reinterpret_cast<uint8_t*>(&app_reset_handler));
 
-	uart1_log<64>(LOG_LEVEL::DEBUG, "Bootloader_task", "Got EOF, boot addr: 0x%08" PRIX32 ", estack: %08" PRIX32, app_reset_handler, app_estack);
-	uart1_log<64>(LOG_LEVEL::INFO, "Bootloader_task", "Jumping to application...");
+	logger->log(LOG_LEVEL::DEBUG, "Bootloader_task", "Got EOF, boot addr: 0x%08" PRIX32 ", estack: %08" PRIX32, app_reset_handler, app_estack);
+	logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Jumping to application...");
 
 	jump_to_addr(app_estack, app_reset_handler);
 
@@ -560,13 +572,15 @@ bool Bootloader_task::load_verify_bin_app_image()
 
 bool Bootloader_task::load_verify_bin_gcm_app_image()
 {
+	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
+
 	const char* appfname = "app.bin.enc";
 	const char* appauxfname = "app.bin.enc.xml";
 
 	int fd = SPIFFS_open(m_fs.get_fs(), appfname, SPIFFS_RDONLY, 0);
 	if(fd < 0)
 	{
-		uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "Opening file %s failed: %" PRId32, appfname, SPIFFS_errno(m_fs.get_fs()));
+		logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "Opening file %s failed: %" PRId32, appfname, SPIFFS_errno(m_fs.get_fs()));
 		return false;
 	}
 
@@ -575,7 +589,7 @@ bool Bootloader_task::load_verify_bin_gcm_app_image()
 		int fd_aux = SPIFFS_open(m_fs.get_fs(), appauxfname, SPIFFS_RDONLY, 0);
 		if(fd < 0)
 		{
-			uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "Opening file %s failed: %" PRId32, appauxfname, SPIFFS_errno(m_fs.get_fs()));
+			logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "Opening file %s failed: %" PRId32, appauxfname, SPIFFS_errno(m_fs.get_fs()));
 			return false;
 		}
 
@@ -583,7 +597,7 @@ bool Bootloader_task::load_verify_bin_gcm_app_image()
 		int ret = SPIFFS_fstat(m_fs.get_fs(), fd_aux, &app_aux_stat);
 		if(ret != SPIFFS_OK)
 		{
-			uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "fstat file %s failed: %" PRId32, appauxfname, SPIFFS_errno(m_fs.get_fs()));
+			logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "fstat file %s failed: %" PRId32, appauxfname, SPIFFS_errno(m_fs.get_fs()));
 			return false;
 		}
 
@@ -591,32 +605,32 @@ bool Bootloader_task::load_verify_bin_gcm_app_image()
 		int read_ret = SPIFFS_read(m_fs.get_fs(), fd_aux, aux_data_file.data(), aux_data_file.size());
 		if(read_ret < 0)
 		{
-			uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "file %s read failed: %" PRId32, appauxfname, SPIFFS_errno(m_fs.get_fs()));
+			logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "file %s read failed: %" PRId32, appauxfname, SPIFFS_errno(m_fs.get_fs()));
 			return false;
 		}
 		else if(size_t(read_ret) != aux_data_file.size())
 		{
-			uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "file %s read failed: %" PRId32, appauxfname, SPIFFS_errno(m_fs.get_fs()));
+			logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "file %s read failed: %" PRId32, appauxfname, SPIFFS_errno(m_fs.get_fs()));
 			return false;
 		}
 
 		tinyxml2::XMLDocument doc;
 		if(doc.Parse(aux_data_file.data(), aux_data_file.size()) != tinyxml2::XML_SUCCESS)
 		{
-			uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "file %s xml parse failed", appauxfname);
+			logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "file %s xml parse failed", appauxfname);
 			return false;
 		}
 
 		if(!aux_data.from_xml(doc))
 		{
-			uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "file %s xml load failed", appauxfname);
+			logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "file %s xml load failed", appauxfname);
 			return false;	
 		}
 
 		s32_t close_ret = SPIFFS_close(m_fs.get_fs(), fd_aux);
 		if(close_ret != SPIFFS_OK)
 		{
-			uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "close file %s failed: %" PRId32, appauxfname, SPIFFS_errno(m_fs.get_fs()));
+			logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "close file %s failed: %" PRId32, appauxfname, SPIFFS_errno(m_fs.get_fs()));
 		}
 	}
 	
@@ -647,7 +661,7 @@ bool Bootloader_task::load_verify_bin_gcm_app_image()
 			size_t out_len = 0;
 			if(!gcm_dec.update(in_block, read_ret, &out_block, &out_len))
 			{
-				uart1_log<64>(LOG_LEVEL::ERROR, "Bootloader_task", "GCM update failed");
+				logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "GCM update failed");
 				return false;
 			}
 
@@ -660,7 +674,7 @@ bool Bootloader_task::load_verify_bin_gcm_app_image()
 		int mbedtls_ret = 0;
 		if(!gcm_dec.finish(&out_block, &out_len, &mbedtls_ret))
 		{
-			uart1_log<64>(LOG_LEVEL::ERROR, "Bootloader_task", "GCM finish failed");
+			logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "GCM finish failed");
 			return false;
 		}
 
@@ -672,10 +686,10 @@ bool Bootloader_task::load_verify_bin_gcm_app_image()
 	s32_t close_ret = SPIFFS_close(m_fs.get_fs(), fd);
 	if(close_ret != SPIFFS_OK)
 	{
-		uart1_log<128>(LOG_LEVEL::ERROR, "Bootloader_task", "close file %s failed: %" PRId32, appfname, SPIFFS_errno(m_fs.get_fs()));
+		logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "close file %s failed: %" PRId32, appfname, SPIFFS_errno(m_fs.get_fs()));
 	}
 
-	uart1_log<64>(LOG_LEVEL::INFO, "Bootloader_task", "File loaded");
+	logger->log(LOG_LEVEL::INFO, "Bootloader_task", "File loaded");
 
 	{
 		uint32_t app_estack = 0;
@@ -684,8 +698,8 @@ bool Bootloader_task::load_verify_bin_gcm_app_image()
 		std::copy_n(axi_base, sizeof(app_estack), reinterpret_cast<uint8_t*>(&app_estack));
 		std::copy_n(axi_base + sizeof(app_estack), sizeof(app_reset_handler), reinterpret_cast<uint8_t*>(&app_reset_handler));
 
-		uart1_log<64>(LOG_LEVEL::DEBUG, "Bootloader_task", "Got EOF, boot addr: 0x%08" PRIX32 ", estack: %08" PRIX32, app_reset_handler, app_estack);
-		uart1_log<64>(LOG_LEVEL::INFO, "Bootloader_task", "Jumping to application...");
+		logger->log(LOG_LEVEL::DEBUG, "Bootloader_task", "Got EOF, boot addr: 0x%08" PRIX32 ", estack: %08" PRIX32, app_reset_handler, app_estack);
+		logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Jumping to application...");
 
 		jump_to_addr(app_estack, app_reset_handler);
 	}
@@ -851,6 +865,8 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 
 bool Bootloader_task::check_option_bytes()
 {
+	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
+
 	FLASH_OBProgramInitTypeDef ob_init;
 	ob_init.Banks = FLASH_BANK_1;
 	HAL_FLASHEx_OBGetConfig(&ob_init);
@@ -858,22 +874,22 @@ bool Bootloader_task::check_option_bytes()
 	bool ret = true;
 	// if(ob_init.WRPState != OB_WRPSTATE_ENABLE)
 	// {
-	// 	uart1_log<64>(LOG_LEVEL::FATAL, "Bootloader_task", "WRPState incorrect");
+	// 	logger->log(LOG_LEVEL::FATAL, "Bootloader_task", "WRPState incorrect");
 	// 	ret = false;
 	// }
 	// if(ob_init.WRPSector != OB_WRP_SECTOR_0)
 	// {
-	// 	uart1_log<64>(LOG_LEVEL::FATAL, "Bootloader_task", "WRPSector incorrect");
+	// 	logger->log(LOG_LEVEL::FATAL, "Bootloader_task", "WRPSector incorrect");
 	// 	ret = false;
 	// }
 	if(ob_init.RDPLevel != OB_RDP_LEVEL_1)
 	{
-		uart1_log<64>(LOG_LEVEL::FATAL, "Bootloader_task", "RDPLevel incorrect");
+		logger->log(LOG_LEVEL::FATAL, "Bootloader_task", "RDPLevel incorrect");
 		ret = false;
 	}
 	if(ob_init.BORLevel != OB_BOR_LEVEL3)
 	{
-		uart1_log<64>(LOG_LEVEL::FATAL, "Bootloader_task", "BORLevel incorrect");
+		logger->log(LOG_LEVEL::FATAL, "Bootloader_task", "BORLevel incorrect");
 		ret = false;
 	}
 
@@ -951,26 +967,28 @@ bool Bootloader_task::handle_usb_set_config_thunk(void* ctx, const uint16_t conf
 
 bool Bootloader_task::init_usb()
 {
+	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
+
 	//set id
 	get_unique_id_str(&usb_id_str);
 
-	uart1_log<64>(LOG_LEVEL::INFO, "main", "usb_driver.set_ep0_buffer");
+	logger->log(LOG_LEVEL::INFO, "main", "usb_driver.set_ep0_buffer");
 	usb_driver.set_ep0_buffer(&usb_ep0_buffer);
 
-	uart1_log<64>(LOG_LEVEL::INFO, "main", "usb_driver.set_tx_buffer");
+	logger->log(LOG_LEVEL::INFO, "main", "usb_driver.set_tx_buffer");
 	usb_driver.set_tx_buffer(&usb_tx_buffer);
 
-	uart1_log<64>(LOG_LEVEL::INFO, "main", "usb_driver.set_rx_buffer");
+	logger->log(LOG_LEVEL::INFO, "main", "usb_driver.set_rx_buffer");
 	usb_driver.set_rx_buffer(&usb_rx_buffer);
 	
-	uart1_log<64>(LOG_LEVEL::INFO, "Bootloader_task", "usb_driver.initialize");
+	logger->log(LOG_LEVEL::INFO, "Bootloader_task", "usb_driver.initialize");
 	if(!usb_driver.initialize())
 	{
-		uart1_log<64>(LOG_LEVEL::FATAL, "Bootloader_task", "usb_driver.initialize failed");
+		logger->log(LOG_LEVEL::FATAL, "Bootloader_task", "usb_driver.initialize failed");
 		return false;	
 	}
 
-	uart1_log<64>(LOG_LEVEL::INFO, "Bootloader_task", "Generate usb descriptor");
+	logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Generate usb descriptor");
 	//lifetime mgmt of some of these is broken
 	{
 		Device_descriptor dev_desc;
@@ -1128,7 +1146,7 @@ bool Bootloader_task::init_usb()
 
 	config_desc_ptr->wTotalLength = config_desc_ptr->get_total_size();
 
-	uart1_log<64>(LOG_LEVEL::INFO, "Bootloader_task", "Allocate buffers");
+	logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Allocate buffers");
 
 	m_rx_buf.resize(1024);
 	m_rx_buf_adapter;
@@ -1138,14 +1156,14 @@ bool Bootloader_task::init_usb()
 	m_tx_buf_adapter;
 	m_tx_buf_adapter.reset(m_tx_buf.data(), m_tx_buf.size());
 
-	uart1_log<64>(LOG_LEVEL::INFO, "Bootloader_task", "usb_core.initialize");
+	logger->log(LOG_LEVEL::INFO, "Bootloader_task", "usb_core.initialize");
 	if(!usb_core.initialize(&usb_driver, 8, m_tx_buf_adapter, m_rx_buf_adapter))
 	{
-		uart1_log<64>(LOG_LEVEL::INFO, "Bootloader_task", "usb_core.initialize failed");
+		logger->log(LOG_LEVEL::INFO, "Bootloader_task", "usb_core.initialize failed");
 		return false;
 	}
 
-	uart1_log<64>(LOG_LEVEL::INFO, "Bootloader_task", "usb_core set descriptors");
+	logger->log(LOG_LEVEL::INFO, "Bootloader_task", "usb_core set descriptors");
 	usb_core.set_usb_class(&usb_cdc);
 	usb_core.set_descriptor_table(&usb_desc_table);
 	usb_core.set_config_callback(&handle_usb_set_config_thunk, this);
@@ -1202,10 +1220,10 @@ bool Bootloader_task::init_usb()
 	// usb_core.set_config_callback(std::bind(&Main_task::usb_config_callback, this));
 	// usb_core.set_descriptor_callback(std::bind(&Main_task::usb_get_descriptor_callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-	uart1_log<64>(LOG_LEVEL::INFO, "Bootloader_task", "usb_core.enable");
+	logger->log(LOG_LEVEL::INFO, "Bootloader_task", "usb_core.enable");
 	if(!usb_core.enable())
 	{
-		uart1_log<64>(LOG_LEVEL::INFO, "Bootloader_task", "usb_core.enable failed");
+		logger->log(LOG_LEVEL::INFO, "Bootloader_task", "usb_core.enable failed");
 		return false;
 	}
 
@@ -1227,10 +1245,10 @@ bool Bootloader_task::init_usb()
 	usb_tx_buffer_task.set_usb_driver(&usb_driver);
 	usb_tx_buffer_task.launch("usb_tx_buf", 5);
 
-	uart1_log<64>(LOG_LEVEL::INFO, "Bootloader_task", "usb_core.connect");
+	logger->log(LOG_LEVEL::INFO, "Bootloader_task", "usb_core.connect");
 	if(!usb_core.connect())
 	{
-		uart1_log<64>(LOG_LEVEL::INFO, "Bootloader_task", "usb_core.connect failed");
+		logger->log(LOG_LEVEL::INFO, "Bootloader_task", "usb_core.connect failed");
 		return false;
 	}
 
