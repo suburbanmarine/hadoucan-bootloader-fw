@@ -57,6 +57,7 @@ void Bootloader_task::work()
 		freertos_util::logging::Global_logger::set(&logging_task.get_logger());
 		freertos_util::logging::Global_logger::get()->set_sev_mask_level(LOG_LEVEL::INFO);
 		// freertos_util::logging::Global_logger::get()->set_sev_mask_level(LOG_LEVEL::DEBUG);
+		// freertos_util::logging::Global_logger::get()->set_sev_mask_level(LOG_LEVEL::TRACE);
 	}
 
 	//start logging_task
@@ -148,7 +149,7 @@ void Bootloader_task::work()
 	}
 	else
 	{
-		logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Skipping option byte check");
+		logger->log(LOG_LEVEL::WARN, "Bootloader_task", "Skipping option byte check");
 	}
 
 	//check for software boot mode request
