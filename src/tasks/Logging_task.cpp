@@ -2,6 +2,9 @@
 
 #include "uart1_printf.hpp"
 
+#include "hal_inst.h"
+#include "stm32h7xx_hal.h"
+
 bool UART1_sink::handle_log(freertos_util::logging::String_type* const log)
 {
 	HAL_StatusTypeDef uartret;

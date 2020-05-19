@@ -2,10 +2,11 @@
 #include "task.h"
 #include "main.h"
 
+#include "common_util/Stack_string.hpp"
+
+#include "hal_inst.h"
 #include "stm32h7xx_hal.h"
 #include "stm32h7xx_hal_pwr.h"
-
-#include "uart1_printf.hpp"
 
 extern "C"
 {
@@ -35,20 +36,22 @@ void vApplicationIdleHook( void )
 
 void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName)
 {
-	for(;;)
-	{
-		uart1_log<64>(LOG_LEVEL::FATAL, "freertos", "Stack Overflow!");
-		vTaskDelay(500);
-	}
+  for(;;)
+  {
+    const char msg[] = "Stack Overflow!";
+    HAL_UART_Transmit(&huart1, reinterpret_cast<uint8_t*>(const_cast<char*>(msg)), strlen(msg), -1);
+    vTaskDelay(500);
+  }
 }
 
 void vApplicationMallocFailedHook(void)
 {
-	for(;;)
-	{
-		uart1_log<64>(LOG_LEVEL::FATAL, "freertos", "Malloc Failed!");
-		vTaskDelay(500);
-	}
+  for(;;)
+  {
+    const char msg[] = "Malloc Failed!";
+    HAL_UART_Transmit(&huart1, reinterpret_cast<uint8_t*>(const_cast<char*>(msg)), strlen(msg), -1);
+    vTaskDelay(500);
+  }
 }
 
 static StaticTask_t xIdleTaskTCBBuffer __attribute__(( section(".ram_dtcm_noload") ));
@@ -59,6 +62,16 @@ void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackTy
   *ppxIdleTaskStackBuffer = &xIdleStack[0];
   *pulIdleTaskStackSize = configMINIMAL_STACK_SIZE;
   /* place for user code */
+}
+
+
+void handle_config_assert(const char* file, const int line, const char* msg)
+{
+  Stack_string<128> str;
+  str.sprintf("Config assert at %s:%d: %d", file, line, msg);
+  {
+    HAL_UART_Transmit(&huart1, reinterpret_cast<uint8_t*>(const_cast<char*>(str.data())), str.size(), -1);
+  }
 }
 
 }

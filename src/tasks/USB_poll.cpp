@@ -1,24 +1,48 @@
 #include "USB_poll.hpp"
 
-#include "uart1_printf.hpp"
+#include "global_inst.hpp"
+
+#include "freertos_cpp_util/logging/Global_logger.hpp"
 
 #include "libusb_dev_cpp/class/cdc/cdc_notification.hpp"
 
+#include "hal_inst.h"
+#include "stm32h7xx_hal.h"
+
 // using freertos_util::logging::Global_logger;
-// using freertos_util::logging::LOG_LEVEL;
+using freertos_util::logging::LOG_LEVEL;
+
+namespace
+{
+	static const bool isr_mode = true;
+}
 
 void USB_core_task::work()
 {
 	// TODO: switch to isr mode
-	// HAL_NVIC_SetPriority(OTG_HS_IRQn, 5, 0);
-	// HAL_NVIC_EnableIRQ(OTG_HS_IRQn);
+	if(isr_mode)
+	{
+		HAL_NVIC_SetPriority(OTG_HS_IRQn, 5, 0);
+		HAL_NVIC_EnableIRQ(OTG_HS_IRQn);
+	}
 
 	for(;;)
 	{
-		// usb_core.poll_driver();
-		// usb_core.poll_event_loop();
 		m_usb_core->wait_event_loop();
 		taskYIELD();
+	}
+}
+
+extern "C"
+{
+	void OTG_HS_IRQHandler(void)
+	{
+		{
+			// const char msg[] = "OTG_HS_IRQHandler";
+			// HAL_UART_Transmit(&huart1, reinterpret_cast<uint8_t*>(const_cast<char*>(msg)), strlen(msg), -1);
+		}
+
+		usb_core.poll_driver();
 	}
 }
 
@@ -26,9 +50,15 @@ void USB_driver_task::work()
 {
 	for(;;)
 	{
-		m_usb_core->poll_driver();
-		taskYIELD();
-		// suspend();
+		if(!isr_mode)
+		{
+			m_usb_core->poll_driver();
+			taskYIELD();
+		}
+		else
+		{
+			suspend();
+		}
 	}
 }
 
