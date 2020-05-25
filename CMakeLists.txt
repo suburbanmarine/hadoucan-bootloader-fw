@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/external/cmake-modules/")
+include(GetGitRevisionDescription)
+
 project(stm32h7_qspi_boot C CXX ASM)
 
 add_definitions(
