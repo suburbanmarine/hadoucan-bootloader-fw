@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.5)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/external/cmake-modules/")
+include(GetGitRevisionDescription)
+get_git_head_revision(GIT_REFSPEC GIT_SHA1)
+
 project(stm32h7_qspi_boot C CXX ASM)
 
 add_definitions(
@@ -69,6 +73,7 @@ add_executable(stm32h7_qspi_boot.elf
 	src/main_cube.c
 	src/global_inst.cpp
 	src/hal_inst.c
+	src/sw_ver.cpp
 	
 	src/tasks/USB_tx_buffer_task.cpp
 	src/tasks/USB_rx_buffer_task.cpp
@@ -87,13 +92,16 @@ add_executable(stm32h7_qspi_boot.elf
 	src/Fastboot.cpp
 )
 
+target_compile_definitions(stm32h7_qspi_boot.elf
+	PRIVATE
+		-DGIT_SHA1="${GIT_SHA1}"
+)
+
 if(DEFINED ENV{ENC_BOOT_KEY})
-	
 	target_compile_definitions(stm32h7_qspi_boot.elf
 		PRIVATE
 			-DENC_BOOT_KEY=$ENV{ENC_BOOT_KEY}
 	)
-
 endif()
 
 target_include_directories(stm32h7_qspi_boot.elf

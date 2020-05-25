@@ -5,6 +5,7 @@
 #include "freertos_cpp_util/logging/Global_logger.hpp"
 
 #include "global_inst.hpp"
+#include "sw_ver.hpp"
 
 #include "hal_inst.h"
 #include "stm32h7xx_hal.h"
@@ -65,7 +66,9 @@ void Bootloader_task::work()
 
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 	
-	logger->log(LOG_LEVEL::ERROR, "Bootloader_task", "Started");
+	logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Started");
+	logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Version: %d.%d.%d", SW_VER_MAJOR, SW_VER_MINOR, SW_VER_PATCH);
+	logger->log(LOG_LEVEL::INFO, "Bootloader_task", "Commit: %s", GIT_COMMIT);
 
 	{
 		std::array<char, 25> id_str;
