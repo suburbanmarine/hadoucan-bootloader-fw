@@ -407,8 +407,8 @@ bool Bootloader_task::load_verify_hex_app_image()
 	std::vector<char> file_buffer;
 	file_buffer.reserve(1024);
 
-	std::string line_buffer;
-	line_buffer.reserve(64);
+	Stack_string<128> line_buffer;
+	// line_buffer.reserve(64);
 
 	//256 byte read buffer
 	std::vector<char> read_buffer;

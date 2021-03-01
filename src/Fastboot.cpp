@@ -102,7 +102,8 @@ void Fastboot::handle_download(const std::vector<uint8_t>& in_packet, std::vecto
 
 	if(get_state() == Fastboot_state::LINE_MODE)
 	{
-		std::string digit_str;
+		Stack_string<128> digit_str;
+		// std::string digit_str;
 		//digit_str.append("0x");
 
 		auto it = std::find(in_packet.begin(), in_packet.end(), ':');
@@ -206,8 +207,8 @@ void Fastboot::handle_flash(const std::vector<uint8_t>& in_packet, std::vector<u
 		return;
 	}
 
-	std::string flash_name;
-	flash_name.reserve(16);
+	Stack_string<128> flash_name;
+
 	it = std::next(it);
 	for(; it != in_packet.end(); ++it)
 	{
@@ -266,8 +267,8 @@ void Fastboot::handle_erase(const std::vector<uint8_t>& in_packet, std::vector<u
 		return;
 	}
 
-	std::string flash_name;
-	flash_name.reserve(16);
+	Stack_string<128> flash_name;
+
 	it = std::next(it);
 	for(; it != in_packet.end(); ++it)
 	{
