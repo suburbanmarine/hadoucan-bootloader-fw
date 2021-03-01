@@ -188,14 +188,14 @@ add_dependencies(stm32h7_qspi_boot_size
 )
 
 add_custom_target(flash_stm32h7_qspi_boot
-	COMMAND openocd -f /usr/local/share/openocd/scripts/interface/stlink.cfg -f /usr/local/share/openocd/scripts/target/stm32h7x.cfg -c "program stm32h7_qspi_boot.elf verify reset exit"
+	COMMAND openocd -f /usr/local/share/openocd/scripts/interface/stlink-v2.cfg -f /usr/local/share/openocd/scripts/target/stm32h7x.cfg -c "program stm32h7_qspi_boot.elf verify reset exit"
 	DEPENDS stm32h7_qspi_boot.elf
 	WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 	VERBATIM
 )
 
 add_custom_target(ram_stm32h7_qspi_boot
-	COMMAND openocd -f /usr/local/share/openocd/scripts/interface/stlink.cfg -f /usr/local/share/openocd/scripts/target/stm32h7x.cfg -c "init;reset halt;load_image stm32h7_qspi_boot.elf;verify_image stm32h7_qspi_boot.elf;mem2array estack_reset_handler 32 0x24000000 2;reg msp $estack_reset_handler(0); resume $estack_reset_handler(1);exit"
+	COMMAND openocd -f /usr/local/share/openocd/scripts/interface/stlink-v2.cfg -f /usr/local/share/openocd/scripts/target/stm32h7x.cfg -c "init;reset halt;load_image stm32h7_qspi_boot.elf;verify_image stm32h7_qspi_boot.elf;mem2array estack_reset_handler 32 0x24000000 2;reg msp $estack_reset_handler(0); resume $estack_reset_handler(1);exit"
 	DEPENDS stm32h7_qspi_boot.elf
 	WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 	VERBATIM

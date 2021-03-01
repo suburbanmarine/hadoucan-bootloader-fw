@@ -56,8 +56,8 @@ void Bootloader_task::work()
 {
 	{
 		freertos_util::logging::Global_logger::set(&logging_task.get_logger());
-		freertos_util::logging::Global_logger::get()->set_sev_mask_level(LOG_LEVEL::INFO);
-		// freertos_util::logging::Global_logger::get()->set_sev_mask_level(LOG_LEVEL::DEBUG);
+		// freertos_util::logging::Global_logger::get()->set_sev_mask_level(LOG_LEVEL::INFO);
+		freertos_util::logging::Global_logger::get()->set_sev_mask_level(LOG_LEVEL::DEBUG);
 		// freertos_util::logging::Global_logger::get()->set_sev_mask_level(LOG_LEVEL::TRACE);
 	}
 

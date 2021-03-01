@@ -187,11 +187,15 @@ void Fastboot::handle_download(const std::vector<uint8_t>& in_packet, std::vecto
 }
 void Fastboot::handle_verify(const std::vector<uint8_t>& in_packet, std::vector<uint8_t>* resp)
 {
+	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
+	logger->log(LOG_LEVEL::INFO, "Fastboot", "handle_verify");
 	resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());
 }
 void Fastboot::handle_flash(const std::vector<uint8_t>& in_packet, std::vector<uint8_t>* resp)
 {
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
+
+	logger->log(LOG_LEVEL::INFO, "Fastboot", "handle_flash");
 
 	resp->clear();
 
@@ -251,6 +255,8 @@ void Fastboot::handle_erase(const std::vector<uint8_t>& in_packet, std::vector<u
 {
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 
+	logger->log(LOG_LEVEL::INFO, "Fastboot", "handle_erase");
+
 	resp->clear();
 
 	auto it = std::find(in_packet.begin(), in_packet.end(), ':');
@@ -294,6 +300,8 @@ void Fastboot::handle_format(const std::vector<uint8_t>& in_packet, std::vector<
 {
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 
+	logger->log(LOG_LEVEL::INFO, "Fastboot", "handle_format");
+
 	logger->log(LOG_LEVEL::INFO, "Fastboot", "Unmount flash fs");
 	m_fs->unmount();
 
@@ -325,14 +333,26 @@ void Fastboot::handle_format(const std::vector<uint8_t>& in_packet, std::vector<
 }
 void Fastboot::handle_boot(const std::vector<uint8_t>& in_packet, std::vector<uint8_t>* resp)
 {
+	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
+
+	logger->log(LOG_LEVEL::INFO, "Fastboot", "handle_boot");
+
 	handle_reboot(in_packet, resp);
 }
 void Fastboot::handle_continue(const std::vector<uint8_t>& in_packet, std::vector<uint8_t>* resp)
 {
+	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
+
+	logger->log(LOG_LEVEL::INFO, "Fastboot", "handle_continue");
+
 	handle_reboot(in_packet, resp);
 }
 void Fastboot::handle_reboot(const std::vector<uint8_t>& in_packet, std::vector<uint8_t>* resp)
 {
+	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
+
+	logger->log(LOG_LEVEL::INFO, "Fastboot", "handle_reboot");
+
 	resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());
 
 	Bootloader_key key;
@@ -362,6 +382,10 @@ void Fastboot::handle_reboot(const std::vector<uint8_t>& in_packet, std::vector<
 }
 void Fastboot::handle_reboot_bootloader(const std::vector<uint8_t>& in_packet, std::vector<uint8_t>* resp)
 {
+	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
+
+	logger->log(LOG_LEVEL::INFO, "Fastboot", "handle_reboot_bootloader");
+
 	resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());
 
 	Bootloader_key key;
@@ -391,5 +415,9 @@ void Fastboot::handle_reboot_bootloader(const std::vector<uint8_t>& in_packet, s
 }
 void Fastboot::handle_powerdown(const std::vector<uint8_t>& in_packet, std::vector<uint8_t>* resp)
 {
+	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
+	
+	logger->log(LOG_LEVEL::INFO, "Fastboot", "handle_powerdown");
+
 	resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());
 }

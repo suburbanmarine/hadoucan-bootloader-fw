@@ -17,7 +17,7 @@
 
 #include "tinyxml2/tinyxml2.h"
 
-class Bootloader_task : public Task_static<4096>
+class Bootloader_task : public Task_static<2048>
 {
 public:
 
