@@ -106,7 +106,6 @@ add_executable(stm32h7_qspi_boot.elf
 	src/hal_inst.c
 	src/sw_ver.cpp
 	
-	src/tasks/USB_tx_buffer_task.cpp
 	src/tasks/USB_rx_buffer_task.cpp
 	src/tasks/Bootloader_task.cpp
 	src/tasks/LED_task.cpp
