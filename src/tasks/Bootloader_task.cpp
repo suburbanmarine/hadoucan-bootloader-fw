@@ -24,6 +24,8 @@
 
 #include <mbedtls/md5.h>
 
+#include <tusb.h>
+
 #include <cctype>
 #include <cinttypes>
 #include <functional>
@@ -362,7 +364,9 @@ void Bootloader_task::work()
 
 		if(!out_buffer.empty())
 		{
-			usb_tx_buffer_task.write(out_buffer.begin(), out_buffer.end());
+			tud_cdc_n_write(0, out_buffer.data(), out_buffer.size());
+			tud_cdc_n_write_flush(0);
+
 			out_buffer.clear();
 		}
 	}
@@ -425,7 +429,7 @@ bool Bootloader_task::load_verify_hex_app_image()
 			line_buffer.assign(file_buffer.begin(), line_next_it);
 			file_buffer.erase(file_buffer.begin(), line_next_it);
 
-			if(!hex_loader.process_line(line_buffer))
+			if(!hex_loader.process_line(line_buffer.data()))
 			{
 				logger->log(LOG_LEVEL::error, "Bootloader_task", "hex_loader.process_line failed: %s", line_buffer.c_str());
 				break;
@@ -966,202 +970,7 @@ bool Bootloader_task::init_usb()
 	//set id
 	get_unique_id_str(&usb_id_str);
 
-	logger->log(LOG_LEVEL::info, "main", "usb_driver.set_ep0_buffer");
-	usb_driver.set_ep0_buffer(&usb_ep0_buffer);
-
-	logger->log(LOG_LEVEL::info, "main", "usb_driver.set_tx_buffer");
-	usb_driver.set_tx_buffer(&usb_tx_buffer);
-
-	logger->log(LOG_LEVEL::info, "main", "usb_driver.set_rx_buffer");
-	usb_driver.set_rx_buffer(&usb_rx_buffer);
-	
-	logger->log(LOG_LEVEL::info, "Bootloader_task", "usb_driver.initialize");
-	if(!usb_driver.initialize())
-	{
-		logger->log(LOG_LEVEL::fatal, "Bootloader_task", "usb_driver.initialize failed");
-		return false;	
-	}
-
-	logger->log(LOG_LEVEL::info, "Bootloader_task", "Generate usb descriptor");
-	//lifetime mgmt of some of these is broken
-	{
-		Device_descriptor dev_desc;
-		dev_desc.bcdUSB = USB_common::build_bcd(2, 0, 0);
-		// dev_desc.bDeviceClass    = static_cast<uint8_t>(USB_common::CLASS_DEF::CLASS_PER_INTERFACE);
-		// dev_desc.bDeviceSubClass = static_cast<uint8_t>(USB_common::SUBCLASS_DEF::SUBCLASS_NONE);
-		dev_desc.bDeviceClass    = 0x02;
-		dev_desc.bDeviceSubClass = 0x02;
-		dev_desc.bDeviceProtocol = static_cast<uint8_t>(USB_common::PROTO_DEF::PROTO_NONE);
-		// dev_desc.bMaxPacketSize0 = m_driver->get_ep0_config().size;
-		dev_desc.bMaxPacketSize0 = 64;
-		dev_desc.idVendor  = 0x0483;
-		dev_desc.idProduct = 0x5740;
-		dev_desc.bcdDevice = USB_common::build_bcd(1, 0, 0);
-		dev_desc.iManufacturer      = 1;
-		dev_desc.iProduct           = 2;
-		dev_desc.iSerialNumber      = 3;
-		dev_desc.bNumConfigurations = 1;
-
-		usb_desc_table.set_device_descriptor(dev_desc, 0);
-	}
-	{
-		//9 byte ea
-		Interface_descriptor desc;
-		desc.bInterfaceNumber   = 0;
-		desc.bAlternateSetting  = 0;
-		desc.bNumEndpoints      = 1;
-		desc.bInterfaceClass    = static_cast<uint8_t>(CDC::COMM_INTERFACE_CLASS_CODE);
-		desc.bInterfaceSubClass = static_cast<uint8_t>(CDC::COMM_INTERFACE_SUBCLASS_CODE::ACM);
-		desc.bInterfaceProtocol = static_cast<uint8_t>(CDC::COMM_CLASS_PROTO_CODE::V250);
-		// desc.bInterfaceProtocol = static_cast<uint8_t>(CDC::COMM_CLASS_PROTO_CODE::NONE);
-		desc.iInterface         = 5;
-		usb_desc_table.set_interface_descriptor(desc, 0);
-	}
-	{
-		Interface_descriptor desc;
-		desc.bInterfaceNumber   = 1;
-		desc.bAlternateSetting  = 0;
-		desc.bNumEndpoints      = 2;
-		desc.bInterfaceClass    = static_cast<uint8_t>(CDC::DATA_INTERFACE_CLASS_CODE);
-		desc.bInterfaceSubClass = static_cast<uint8_t>(CDC::DATA_INTERFACE_SUBCLASS_CODE);
-		desc.bInterfaceProtocol = static_cast<uint8_t>(CDC::DATA_INTERFACE_PROTO_CODE::NONE);
-		desc.iInterface         = 6;
-		usb_desc_table.set_interface_descriptor(desc, 1);
-	}
-	{
-		//7 byte ea
-		Endpoint_descriptor desc;
-		desc.bEndpointAddress = 0x00 | 0x01;
-		desc.bmAttributes     = static_cast<uint8_t>(Endpoint_descriptor::ATTRIBUTE_TRANSFER::BULK);
-		desc.wMaxPacketSize   = 512;
-		desc.bInterval        = 0;
-		usb_desc_table.set_endpoint_descriptor(desc, desc.bEndpointAddress);
-
-		desc.bEndpointAddress = 0x80 | 0x01;
-		desc.bmAttributes     = static_cast<uint8_t>(Endpoint_descriptor::ATTRIBUTE_TRANSFER::BULK);
-		desc.wMaxPacketSize   = 512;
-		desc.bInterval        = 0;
-		usb_desc_table.set_endpoint_descriptor(desc, desc.bEndpointAddress);
-
-		desc.bEndpointAddress = 0x80 | 0x02;
-		// desc.bmAttributes     = static_cast<uint8_t>(Endpoint_descriptor::ATTRIBUTE_TRANSFER::BULK);
-		desc.bmAttributes     = static_cast<uint8_t>(Endpoint_descriptor::ATTRIBUTE_TRANSFER::INTERRUPT);
-		desc.wMaxPacketSize   = 8;
-		desc.bInterval        = 8;//for HS, period is 2^(bInterval-1) * 125 us, so 8 -> 16ms
-		usb_desc_table.set_endpoint_descriptor(desc, desc.bEndpointAddress);
-	}
-
-	{
-		//configuration 1
-		Config_desc_table::Config_desc_ptr desc_ptr = std::make_shared<Configuration_descriptor>();
-		desc_ptr->wTotalLength = 0;//updated later
-		desc_ptr->bNumInterfaces = 2;
-		desc_ptr->bConfigurationValue = 1;
-		desc_ptr->iConfiguration = 4;
-		desc_ptr->bmAttributes = static_cast<uint8_t>(Configuration_descriptor::ATTRIBUTES::NONE);
-		desc_ptr->bMaxPower = Configuration_descriptor::ma_to_maxpower(150);
-
-		usb_desc_table.set_config_descriptor(desc_ptr, 0);
-	}
-	{
-		std::shared_ptr<String_descriptor_zero> desc_ptr = std::make_shared<String_descriptor_zero>();
-
-		const static String_descriptor_zero::LANGID lang[] = {String_descriptor_zero::LANGID::ENUS};
-		desc_ptr->assign(lang, 1);
-
-		usb_desc_table.set_string_descriptor(desc_ptr, String_descriptor_zero::LANGID::NONE, 0);
-	}
-	{
-		String_descriptor_base desc;
-		desc.assign("Suburban Marine, Inc.");
-		usb_desc_table.set_string_descriptor(desc, String_descriptor_zero::LANGID::ENUS, 1);
-	}
-	{
-		String_descriptor_base desc;
-		desc.assign("SM-1301 Bootloader");
-		usb_desc_table.set_string_descriptor(desc, String_descriptor_zero::LANGID::ENUS, 2);
-	}
-	{
-		String_descriptor_base desc;
-		desc.assign(usb_id_str.data());
-		usb_desc_table.set_string_descriptor(desc, String_descriptor_zero::LANGID::ENUS, 3);
-	}
-	{
-		String_descriptor_base desc;
-		desc.assign("Default configuration");
-		usb_desc_table.set_string_descriptor(desc, String_descriptor_zero::LANGID::ENUS, 4);
-	}
-	{
-		String_descriptor_base desc;
-		desc.assign("Communications");
-		usb_desc_table.set_string_descriptor(desc, String_descriptor_zero::LANGID::ENUS, 5);
-	}
-	{
-		String_descriptor_base desc;
-		desc.assign("CDC Data");
-		usb_desc_table.set_string_descriptor(desc, String_descriptor_zero::LANGID::ENUS, 6);
-	}
-	std::shared_ptr<CDC::CDC_header_descriptor> cdc_header_desc = std::make_shared<CDC::CDC_header_descriptor>();
-	cdc_header_desc->bcdCDC = USB_common::build_bcd(1,1,0);
-	usb_desc_table.add_other_descriptor(cdc_header_desc);
-
-	std::shared_ptr<CDC::CDC_call_management_descriptor> cdc_call_mgmt_desc = std::make_shared<CDC::CDC_call_management_descriptor>();
-	cdc_call_mgmt_desc->set_self_call_mgmt_handle(false);
-	cdc_call_mgmt_desc->bDataInterface = 1;
-	usb_desc_table.add_other_descriptor(cdc_call_mgmt_desc);
-
-	std::shared_ptr<CDC::CDC_acm_descriptor> cdc_acm_desc = std::make_shared<CDC::CDC_acm_descriptor>();
-	// cdc_acm_desc->bmCapabilities = 0x00;
-	cdc_acm_desc->set_support_network_connection(true);
-	cdc_acm_desc->set_support_send_break(false);
-	cdc_acm_desc->set_support_line(true);
-	cdc_acm_desc->set_support_comm(true);
-	// cdc_acm_desc->bmCapabilities = 0x03;
-	usb_desc_table.add_other_descriptor(cdc_acm_desc);
-
-	std::shared_ptr<CDC::CDC_union_descriptor> cdc_union_desc = std::make_shared<CDC::CDC_union_descriptor>();
-	cdc_union_desc->bMasterInterface = 0;
-	cdc_union_desc->bSlaveInterface0 = 1;
-	usb_desc_table.add_other_descriptor(cdc_union_desc);
-	
-	Config_desc_table::Config_desc_ptr config_desc_ptr = usb_desc_table.get_config_descriptor(0);
-
-	//register iface and ep to configuration
-	config_desc_ptr->get_desc_list().push_back( usb_desc_table.get_interface_descriptor(0).get() );
-	config_desc_ptr->get_desc_list().push_back( cdc_header_desc.get() );
-	config_desc_ptr->get_desc_list().push_back( cdc_acm_desc.get() );
-	config_desc_ptr->get_desc_list().push_back( cdc_union_desc.get() );
-	config_desc_ptr->get_desc_list().push_back( cdc_call_mgmt_desc.get() );
-	config_desc_ptr->get_desc_list().push_back( usb_desc_table.get_endpoint_descriptor(0x82).get() );
-
-	config_desc_ptr->get_desc_list().push_back( usb_desc_table.get_interface_descriptor(1).get() );
-	config_desc_ptr->get_desc_list().push_back( usb_desc_table.get_endpoint_descriptor(0x01).get() );
-	config_desc_ptr->get_desc_list().push_back( usb_desc_table.get_endpoint_descriptor(0x81).get() );
-
-	config_desc_ptr->wTotalLength = config_desc_ptr->get_total_size();
-
-	logger->log(LOG_LEVEL::info, "Bootloader_task", "Allocate buffers");
-
-	m_rx_buf.resize(1024);
-	m_rx_buf_adapter;
-	m_rx_buf_adapter.reset(m_rx_buf.data(), m_rx_buf.size());
-
-	m_tx_buf.resize(1024);
-	m_tx_buf_adapter;
-	m_tx_buf_adapter.reset(m_tx_buf.data(), m_tx_buf.size());
-
-	logger->log(LOG_LEVEL::info, "Bootloader_task", "usb_core.initialize");
-	if(!usb_core.initialize(&usb_driver, 8, m_tx_buf_adapter, m_rx_buf_adapter))
-	{
-		logger->log(LOG_LEVEL::info, "Bootloader_task", "usb_core.initialize failed");
-		return false;
-	}
-
-	logger->log(LOG_LEVEL::info, "Bootloader_task", "usb_core set descriptors");
-	usb_core.set_usb_class(&usb_cdc);
-	usb_core.set_descriptor_table(&usb_desc_table);
-	usb_core.set_config_callback(&handle_usb_set_config_thunk, this);
-
+	// config gpio
 	__HAL_RCC_GPIOC_CLK_ENABLE();
 	__HAL_RCC_GPIOA_CLK_ENABLE();
 	__HAL_RCC_GPIOB_CLK_ENABLE();
@@ -1207,44 +1016,29 @@ bool Bootloader_task::init_usb()
 	__HAL_RCC_USB_OTG_HS_CLK_ENABLE();
 	__HAL_RCC_USB_OTG_HS_ULPI_CLK_ENABLE();
 
-	// HAL_NVIC_SetPriority(OTG_HS_IRQn, 5, 0);
-	// HAL_NVIC_EnableIRQ(OTG_HS_IRQn);
-
-	// usb_core.set_control_callback(std::bind(&Main_task::usb_control_callback, this, std::placeholders::_1));
-	// usb_core.set_config_callback(std::bind(&Main_task::usb_config_callback, this));
-	// usb_core.set_descriptor_callback(std::bind(&Main_task::usb_get_descriptor_callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-
-	logger->log(LOG_LEVEL::info, "Bootloader_task", "usb_core.enable");
-	if(!usb_core.enable())
+	// Start tinyusb
 	{
-		logger->log(LOG_LEVEL::info, "Bootloader_task", "usb_core.enable failed");
-		return false;
-	}
+		NVIC_SetPriority(OTG_HS_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY);
+		// NVIC_EnableIRQ(OTG_HS_IRQn);
 
+		tusb_rhport_init_t dev_init = {
+			.role = TUSB_ROLE_DEVICE,
+			.speed = TUSB_SPEED_AUTO
+		};
+		tusb_init(1, &dev_init);
+
+		// tud_cdc_configure_t cdc_init = {
+		// 	.rx_persistent = 0;
+		// 	.tx_persistent = 0;
+		// 	.tx_overwritabe_if_not_connected = 1;
+		// };
+		// tud_cdc_configure(&cdc_init);
+	}
 
 
 	//process usb packets
-	usb_core_task.set_usb_core(&usb_core);
 	usb_core_task.launch("usb_core", 1);
-
-	usb_cdc_task.set_usb_core(&usb_core);
-	usb_cdc_task.launch("usb_cdc", 1);
-
-	usb_drvr_task.set_usb_core(&usb_core);
-	usb_drvr_task.launch("usb_drvr", 1);
-
-	usb_rx_buffer_task.set_usb_driver(&usb_driver);
 	usb_rx_buffer_task.launch("usb_rx_buf", 4);
-
-	usb_tx_buffer_task.set_usb_driver(&usb_driver);
-	usb_tx_buffer_task.launch("usb_tx_buf", 5);
-
-	logger->log(LOG_LEVEL::info, "Bootloader_task", "usb_core.connect");
-	if(!usb_core.connect())
-	{
-		logger->log(LOG_LEVEL::info, "Bootloader_task", "usb_core.connect failed");
-		return false;
-	}
 
 	return true;
 }
