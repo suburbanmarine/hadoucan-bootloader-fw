@@ -146,16 +146,15 @@ target_link_libraries(stm32h7_qspi_boot.elf
 	stm32h7xx_ll
 	stm32h750xx_cmsis
 
-	freertos_v10_heap4
 	freertos_v10
+	freertos_v10_heap4
 	freertos_v10_cmsis
 
 	bootloader_util
 	common_util
 	freertos_cpp_util
 
-	usb_dev_cpp
-	usb_dev_cpp_stm32
+	tinyusb
 
 	spi_flash
 	spiffs_flash
