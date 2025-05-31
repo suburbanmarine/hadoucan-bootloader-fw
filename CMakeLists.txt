@@ -6,6 +6,8 @@ get_git_head_revision(GIT_REFSPEC GIT_SHA1)
 
 project(stm32h7_qspi_boot C CXX ASM)
 
+set(STM32CUBEH7_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/STM32CubeH7)
+
 add_definitions(
 	-DSTM32H750xx
 	-D__weak=__attribute__\(\(weak\)\)
@@ -32,18 +34,47 @@ include_directories(
 	external/mbedtls/include
 )
 
-add_subdirectory(external/stm32cube_fw_h7_v1_4_0)
-add_subdirectory(external/tinyxml2)
-add_subdirectory(external/mbedtls)
+add_library(tinyusb_config INTERFACE)
+target_include_directories(tinyusb_config
+	INTERFACE
+		hadoucan-fw/include
+)
+target_compile_definitions(tinyusb_config
+	INTERFACE
+		CFG_TUSB_MCU=OPT_MCU_STM32H7
+)
+target_link_libraries(tinyusb_config
+	INTERFACE
+		freertos_v10
+)
+
+add_library(tinyusb_dcd
+	external/tinyusb/src/portable/synopsys/dwc2/dcd_dwc2.c
+	external/tinyusb/src/portable/synopsys/dwc2/dwc2_common.c
+)
+target_include_directories(tinyusb_dcd
+	PUBLIC
+		external/tinyusb/src
+)
+target_link_libraries(tinyusb_dcd
+	PUBLIC
+		tinyusb
+		tinyusb_config
+		stm32h750xx_cmsis
+)
 
 add_subdirectory(external/crc)
-add_subdirectory(external/freertos_cpp_util)
-add_subdirectory(external/common_util)
+add_subdirectory(external/mbedtls)
+add_subdirectory(external/STM32CubeH7_cmake)
+add_subdirectory(external/tinyusb/src)
+add_subdirectory(external/tinyxml2)
+
 add_subdirectory(external/bootloader_util)
+add_subdirectory(external/common_util)
 add_subdirectory(external/emb_fs_util)
+add_subdirectory(external/freertos_cpp_util)
 add_subdirectory(external/mbedtls_util)
 add_subdirectory(external/tinyxml2_util)
-add_subdirectory(external/libusb_dev_cpp)
 
 add_library(spiffs
 	external/spiffs/src/spiffs_cache.c
