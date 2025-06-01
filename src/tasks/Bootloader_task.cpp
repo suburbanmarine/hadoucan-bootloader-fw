@@ -429,7 +429,7 @@ bool Bootloader_task::load_verify_hex_app_image()
 			line_buffer.assign(file_buffer.begin(), line_next_it);
 			file_buffer.erase(file_buffer.begin(), line_next_it);
 
-			if(!hex_loader.process_line(line_buffer.data()))
+			if(!hex_loader.process_line(line_buffer.data(), line_buffer.size()))
 			{
 				logger->log(LOG_LEVEL::error, "Bootloader_task", "hex_loader.process_line failed: %s", line_buffer.c_str());
 				break;
