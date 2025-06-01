@@ -178,7 +178,7 @@ target_link_libraries(stm32h7_qspi_boot.elf
 # Generate intel hex image
 add_custom_command(
 	OUTPUT stm32h7_qspi_boot.hex
-	COMMAND ${ATOLLIC_PATH}/arm-atollic-eabi-objcopy -Oihex stm32h7_qspi_boot.elf stm32h7_qspi_boot.hex
+	COMMAND arm-none-eabi-objcopy -Oihex stm32h7_qspi_boot.elf stm32h7_qspi_boot.hex
 	DEPENDS stm32h7_qspi_boot.elf
 	WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 	VERBATIM	
@@ -193,7 +193,7 @@ add_custom_target(stm32h7_qspi_boot_hex
 # Generate raw image
 add_custom_command(
 	OUTPUT stm32h7_qspi_boot.bin
-	COMMAND ${ATOLLIC_PATH}/arm-atollic-eabi-objcopy -S -Obinary stm32h7_qspi_boot.elf stm32h7_qspi_boot.bin
+	COMMAND arm-none-eabi-objcopy -S -Obinary stm32h7_qspi_boot.elf stm32h7_qspi_boot.bin
 	DEPENDS stm32h7_qspi_boot.elf
 	WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 	VERBATIM	
@@ -209,7 +209,7 @@ add_custom_target(stm32h7_qspi_boot_bin
 # Print the image size
 add_custom_target(stm32h7_qspi_boot_size
 	ALL
-	COMMAND ${ATOLLIC_PATH}/arm-atollic-eabi-size --format=sysv stm32h7_qspi_boot.elf
+	COMMAND arm-none-eabi-size --format=sysv stm32h7_qspi_boot.elf
 	DEPENDS stm32h7_qspi_boot.elf
 	WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 	VERBATIM
