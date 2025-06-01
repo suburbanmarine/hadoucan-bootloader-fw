@@ -957,12 +957,6 @@ bool Bootloader_task::config_option_bytes()
 	return true;
 }
 
-
-bool Bootloader_task::handle_usb_set_config_thunk(void* ctx, const uint16_t config)
-{
-	return static_cast<Bootloader_task*>(ctx)->handle_usb_set_config(config);
-}
-
 bool Bootloader_task::init_usb()
 {
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
@@ -1041,69 +1035,6 @@ bool Bootloader_task::init_usb()
 	usb_rx_buffer_task.launch("usb_rx_buf", 4);
 
 	return true;
-}
-
-bool Bootloader_task::handle_usb_set_config(const uint8_t config)
-{
-	bool ret = false;
-
-	switch(config)
-	{
-		case 0:
-		{
-			usb_core.get_driver()->ep_stall(0x01);
-			usb_core.get_driver()->ep_stall(0x81);
-			usb_core.get_driver()->ep_stall(0x82);
-			ret = true;
-			break;
-		}
-		case 1:
-		{
-
-
-			//out 1
-			{
-				Endpoint_desc_table::Endpoint_desc_const_ptr ep_data_out = usb_desc_table.get_endpoint_descriptor(0x01);
-
-				usb_driver_base::ep_cfg ep1;
-				ep1.num  = ep_data_out->bEndpointAddress;
-				ep1.size = ep_data_out->wMaxPacketSize;
-				ep1.type = usb_driver_base::EP_TYPE::BULK;
-				usb_core.get_driver()->ep_config(ep1);
-			}
-			//in 1
-			{
-				Endpoint_desc_table::Endpoint_desc_const_ptr ep_data_in = usb_desc_table.get_endpoint_descriptor(0x81);
-				usb_driver_base::ep_cfg ep2;
-				ep2.num  = ep_data_in->bEndpointAddress;
-				ep2.size = ep_data_in->wMaxPacketSize;
-				ep2.type = usb_driver_base::EP_TYPE::BULK;
-				usb_core.get_driver()->ep_config(ep2);
-			}
-			//in 2
-			{
-				Endpoint_desc_table::Endpoint_desc_const_ptr ep_notify_in = usb_desc_table.get_endpoint_descriptor(0x82);
-
-				usb_driver_base::ep_cfg ep3;
-				ep3.num  = ep_notify_in->bEndpointAddress;
-				ep3.size = ep_notify_in->wMaxPacketSize;
-				ep3.type = usb_driver_base::EP_TYPE::INTERRUPT;
-				usb_core.get_driver()->ep_config(ep3);
-			}
-
-			usb_cdc_task.notify_new_connection();
-
-			ret = true;
-			break;
-		}
-		default:
-		{
-			ret = false;
-			break;
-		}
-	}
-
-	return ret;
 }
 
 void Bootloader_task::get_unique_id(std::array<uint32_t, 3>* const id)

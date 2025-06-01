@@ -66,9 +66,6 @@ protected:
 	W25Q16JV m_qspi;
 	W25Q16JV_app_region m_fs;
 
-	static bool handle_usb_set_config_thunk(void* ctx, const uint16_t config);
-	bool handle_usb_set_config(const uint8_t config);
-
 	std::array<char, 25> usb_id_str;
 
 	Fastboot m_fastboot;

@@ -154,6 +154,8 @@ target_link_libraries(stm32h7_qspi_boot.elf
 	freertos_cpp_util
 
 	tinyusb
+	tinyusb_config
+	tinyusb_dcd
 
 	spi_flash
 	spiffs_flash
