@@ -9,7 +9,7 @@
 
 #include "Fastboot.hpp"
 
-#include "USB_rx_buffer_task.hpp"
+#include "freertos_cpp_util/Task_static.hpp"
 
 #include "tinyxml2/tinyxml2.h"
 

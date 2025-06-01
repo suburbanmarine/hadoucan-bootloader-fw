@@ -18,8 +18,8 @@
 #define CFG_TUD_MAX_SPEED     OPT_MODE_HIGH_SPEED
 
 #ifndef CFG_TUSB_MEM_SECTION
-// #define CFG_TUSB_MEM_SECTION __attribute__ (( section(".ram_dtcm") ))
-#define CFG_TUSB_MEM_SECTION
+#define CFG_TUSB_MEM_SECTION __attribute__ (( section(".ram_dtcm_noload") ))
+// #define CFG_TUSB_MEM_SECTION
 #endif
 
 #ifndef CFG_TUSB_MEM_ALIGN

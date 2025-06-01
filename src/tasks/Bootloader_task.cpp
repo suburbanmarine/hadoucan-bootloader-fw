@@ -4,7 +4,6 @@
 
 #include "freertos_cpp_util/logging/Global_logger.hpp"
 
-#include "global_inst.hpp"
 #include "sw_ver.hpp"
 
 #include "hal_inst.h"
@@ -18,9 +17,7 @@
 
 #include "freertos_cpp_util/logging/Global_logger.hpp"
 
-#include "USB_rx_buffer_task.hpp"
-#include "USB_poll.hpp"
-#include "Logging_task.hpp"
+#include "global_inst.hpp"
 
 #include <mbedtls/md5.h>
 
@@ -31,10 +28,6 @@
 #include <functional>
 
 using freertos_util::logging::LOG_LEVEL;
-
-USB_core_task      usb_core_task      __attribute__ (( section(".ram_dtcm_noload") ));
-USB_rx_buffer_task usb_rx_buffer_task __attribute__ (( section(".ram_dtcm_noload") ));
-Logging_task       logging_task       __attribute__(( section(".ram_d2_s1_noload") ));
 
 void Bootloader_task::work()
 {

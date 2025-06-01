@@ -23,7 +23,9 @@
  *
  */
 
-#include "USB_poll.hpp"
+#include "tasks/USB_poll.hpp"
+
+#include "global_inst.hpp"
 
 #include "freertos_cpp_util/logging/Global_logger.hpp"
 
@@ -39,6 +41,15 @@ void USB_core_task::work()
 
 		taskYIELD();
 	}
+}
+
+void USB_core_task::wait_for_usb_rx_avail()
+{
+
+}
+void USB_core_task::wait_for_usb_tx_complete()
+{
+
 }
 
 extern "C"
@@ -249,7 +260,16 @@ extern "C"
 
 	void tud_cdc_line_state_cb(uint8_t instance, bool dtr, bool rts)
 	{
-	
+		usb_core_task.m_dtr.store(dtr);
+		usb_core_task.m_rts.store(rts);
+	}
+
+	void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* p_line_coding)
+	{
+		usb_core_task.m_bit_rate.store(p_line_coding->bit_rate);
+		usb_core_task.m_stop_bits.store(p_line_coding->stop_bits);
+		usb_core_task.m_parity.store(p_line_coding->parity);
+		usb_core_task.m_data_bits.store(p_line_coding->data_bits);
 	}
 
 	// RX complete data available
