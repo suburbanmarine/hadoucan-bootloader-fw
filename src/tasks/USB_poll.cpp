@@ -1,28 +1,3 @@
-/*
- * The MIT License (MIT)
- *
- * Copyright (c) 2019 Ha Thach (tinyusb.org)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- */
-
 #include "tasks/USB_poll.hpp"
 
 #include "global_inst.hpp"
@@ -152,11 +127,19 @@ extern "C"
 	char const *string_desc_arr[] =
 	{
 		(const char[]) { 0x09, 0x04 }, // 0: is supported language is English (0x0409)
-		"SM",                  // 1: Manufacturer
-		"Hadoucan Bootloader", // 2: Product
-		NULL,                  // 3: Serials will use unique ID if possible
-		"Hadoucan CDC"         // 4: CDC Interface
+		"Suburban Marine, Inc.", // 1: Manufacturer
+		"HadouCAN Bootloader",   // 2: Product
+		NULL,                    // 3: Serials will use unique ID if possible
+		"HadouCAN CDC"           // 4: CDC Interface
 	};
+
+	void ascii_to_u16le(const size_t len, char const * const in, uint16_t* const out)
+	{
+		for(size_t i = 0; i < len; i++)
+		{
+			out[i+1] = in[i];
+		}
+	}
 
 	static uint16_t desc_str_u16 [64 + 1];
 	uint16_t const * tud_descriptor_string_cb(uint8_t index, uint16_t langid)
@@ -178,9 +161,7 @@ extern "C"
 
 				chr_count = id_str.size() - 1;
 
-				for ( size_t i = 0; i < chr_count; i++ ) {
-					desc_str_u16[1 + i] = id_str[i];
-				}
+				ascii_to_u16le(chr_count, id_str.data(), desc_str_u16);
 
 				break;
 			}
@@ -190,15 +171,10 @@ extern "C"
 
 				const char *str = string_desc_arr[index];
 
-				// Cap at max char
-				chr_count = strlen(str);
-				size_t const max_count = sizeof(desc_str_u16) / sizeof(desc_str_u16[0]) - 1; // -1 for string type
-				if ( chr_count > max_count ) chr_count = max_count;
+				chr_count = std::min(strlen(str), sizeof(desc_str_u16) / sizeof(desc_str_u16[0]) - 1);
 
-				// Convert ASCII string into UTF-16
-				for ( size_t i = 0; i < chr_count; i++ ) {
-					desc_str_u16[1 + i] = str[i];
-				}
+				ascii_to_u16le(chr_count, str, desc_str_u16);
+
 				break;
 			}
 		}
