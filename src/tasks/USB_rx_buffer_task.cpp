@@ -18,12 +18,15 @@ void USB_rx_buffer_task::work()
 	for(;;)
 	{
 		{
+			while( ! tud_cdc_n_available(0) )
+			{
+				usb_core_task.wait_for_usb_rx_avail();
+			}
+
 			in_buf.resize(512);
-			usb_core_task.wait_for_usb_rx_avail();
 			uint32_t ret = tud_cdc_n_read(0, in_buf.data(), in_buf.size());
 			in_buf.resize(ret);
 
-			volatile uint8_t* in_ptr = in_buf.data();
 			{
 				std::unique_lock<Mutex_static> lock(m_rx_buf_mutex);
 
@@ -36,7 +39,7 @@ void USB_rx_buffer_task::work()
 					} while((m_rx_buf.size() + in_buf.size()) > BUFFER_LOW_WATERMARK);
 				}
 
-				m_rx_buf.insert(m_rx_buf.end(), in_ptr, in_ptr + in_buf.size());
+				m_rx_buf.insert(m_rx_buf.end(), in_buf.data(), in_buf.data() + in_buf.size());
 			}
 		}
 

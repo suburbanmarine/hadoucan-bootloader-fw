@@ -43,14 +43,14 @@ void USB_core_task::work()
 
 void USB_core_task::wait_for_usb_rx_avail()
 {
-	while( RX_AVAIL_BIT != m_events.wait_bits(RX_AVAIL_BIT, true, true, portMAX_DELAY) )
+	while( ! (RX_AVAIL_BIT & m_events.wait_bits(RX_AVAIL_BIT, true, true, portMAX_DELAY)) )
 	{
 
 	}
 }
 void USB_core_task::wait_for_usb_tx_complete()
 {
-	while( TX_COMPL_BIT != m_events.wait_bits(TX_COMPL_BIT, true, true, portMAX_DELAY) )
+	while( ! (TX_COMPL_BIT & m_events.wait_bits(TX_COMPL_BIT, true, true, portMAX_DELAY)) )
 	{
 
 	}

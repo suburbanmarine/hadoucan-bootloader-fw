@@ -39,7 +39,7 @@ public:
 	void wait_for_usb_tx_complete();
 	
 private:
-	const static EventBits_t RX_AVAIL_BIT = 0x01U;
-	const static EventBits_t TX_COMPL_BIT = 0x02U;
-	Event_group_statc m_events;
+	const static EventBits_t RX_AVAIL_BIT = 0x0001U;
+	const static EventBits_t TX_COMPL_BIT = 0x0002U;
+	Event_group_static m_events;
 };
