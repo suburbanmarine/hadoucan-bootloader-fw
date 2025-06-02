@@ -358,7 +358,7 @@ void Bootloader_task::work()
 		if(!out_buffer.empty())
 		{
 			tud_cdc_n_write(0, out_buffer.data(), out_buffer.size());
-			// tud_cdc_n_write_flush(0);
+			tud_cdc_n_write_flush(0);
 
 			out_buffer.clear();
 		}
@@ -1014,12 +1014,11 @@ bool Bootloader_task::init_usb()
 		};
 		tusb_init(1, &dev_init);
 
-		// tud_cdc_configure_t cdc_init = {
-		// 	.rx_persistent = 0;
-		// 	.tx_persistent = 0;
-		// 	.tx_overwritabe_if_not_connected = 1;
-		// };
-		// tud_cdc_configure(&cdc_init);
+		tud_cdc_configure_fifo_t cdc_init = {
+			.rx_persistent = 0,
+			.tx_persistent = 0
+		};
+		tud_cdc_configure_fifo(&cdc_init);
 	}
 
 
