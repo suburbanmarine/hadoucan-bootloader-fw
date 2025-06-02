@@ -1,4 +1,4 @@
-#include "Bootloader_task.hpp"
+#include "tasks/Bootloader_task.hpp"
 
 #include "bootloader_aes_gcm_key.hpp"
 
@@ -76,7 +76,7 @@ void Bootloader_task::work()
 	}
 	
 	//verify BOR, RDP, JTAG
-	if(1)
+	if(0)
 	{
 		logger->log(LOG_LEVEL::info, "Bootloader_task", "Checking option byte");
 		if(!check_option_bytes())
@@ -358,7 +358,7 @@ void Bootloader_task::work()
 		if(!out_buffer.empty())
 		{
 			tud_cdc_n_write(0, out_buffer.data(), out_buffer.size());
-			tud_cdc_n_write_flush(0);
+			// tud_cdc_n_write_flush(0);
 
 			out_buffer.clear();
 		}

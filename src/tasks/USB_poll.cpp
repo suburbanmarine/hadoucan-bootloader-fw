@@ -152,13 +152,13 @@ extern "C"
 	char const *string_desc_arr[] =
 	{
 		(const char[]) { 0x09, 0x04 }, // 0: is supported language is English (0x0409)
-		"SM",          // 1: Manufacturer
-		"Hadoucan",    // 2: Product
-		NULL,          // 3: Serials will use unique ID if possible
-		"Hadoucan CDC" // 4: CDC Interface
+		"SM",                  // 1: Manufacturer
+		"Hadoucan Bootloader", // 2: Product
+		NULL,                  // 3: Serials will use unique ID if possible
+		"Hadoucan CDC"         // 4: CDC Interface
 	};
 
-	static uint16_t desc_str_u16 [32 + 1];
+	static uint16_t desc_str_u16 [64 + 1];
 	uint16_t const * tud_descriptor_string_cb(uint8_t index, uint16_t langid)
 	{
 		size_t chr_count = 0;
@@ -173,7 +173,15 @@ extern "C"
 			}
 			case STRID_SERIAL:
 			{
-				chr_count = 0;
+				std::array<char, 25> id_str;
+				Bootloader_task::get_unique_id_str(&id_str);
+
+				chr_count = id_str.size() - 1;
+
+				for ( size_t i = 0; i < chr_count; i++ ) {
+					desc_str_u16[1 + i] = id_str[i];
+				}
+
 				break;
 			}
 			default:
