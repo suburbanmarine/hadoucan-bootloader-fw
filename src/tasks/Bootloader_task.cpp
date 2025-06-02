@@ -1023,8 +1023,8 @@ bool Bootloader_task::init_usb()
 
 
 	//process usb packets
-	usb_core_task.launch("usb_core", 1);
-	usb_rx_buffer_task.launch("usb_rx_buf", 4);
+	usb_rx_buffer_task.launch("usb_rx_buf", 3);
+	usb_core_task.launch("usb_core", 4);
 
 	return true;
 }
