@@ -1,14 +1,26 @@
 #pragma once
 
 #include "freertos_cpp_util/Task_static.hpp"
+#include "freertos_cpp_util/Event_group_static.hpp"
+
+#include "tusb.h"
 
 #include <atomic>
 
 class USB_core_task : public Task_static<2048>
 {
+	friend void tud_suspend_cb(bool remote_wakeup_en);
+	friend void tud_resume_cb(void);
+	friend void tud_mount_cb(void);
+	friend void tud_umount_cb(void);
+	friend void tud_cdc_line_state_cb(uint8_t instance, bool dtr, bool rts);
+	friend void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* p_line_coding);
+	friend void tud_cdc_rx_cb(uint8_t itf);
+	friend void tud_cdc_tx_complete_cb(uint8_t itf);
+
 public:
 
-	USB_core_task() : m_dtr(false), m_rts(false), m_bit_rate(0), m_stop_bits(0), m_parity(0), m_data_bits(0), m_rx_avail(false), m_tx_complete(false)
+	USB_core_task() : m_dtr(false), m_rts(false), m_bit_rate(0), m_stop_bits(0), m_parity(0), m_data_bits(0)
 	{
 
 	}
@@ -27,6 +39,7 @@ public:
 	void wait_for_usb_tx_complete();
 	
 private:
-	std::atomic<bool> m_rx_avail;
-	std::atomic<bool> m_tx_complete;
+	const static EventBits_t RX_AVAIL_BIT = 0x01U;
+	const static EventBits_t TX_COMPL_BIT = 0x02U;
+	Event_group_statc m_events;
 };

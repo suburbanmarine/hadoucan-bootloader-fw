@@ -1,5 +1,7 @@
 #include "tasks/USB_rx_buffer_task.hpp"
 
+#include "global_inst.hpp"
+
 #include "freertos_cpp_util/logging/Global_logger.hpp"
 
 using freertos_util::logging::LOG_LEVEL;
@@ -17,6 +19,9 @@ void USB_rx_buffer_task::work()
 	{
 		{
 			in_buf.resize(512);
+			usb_core_task.wait_for_usb_rx_avail();
+			uint32_t ret = tud_cdc_n_read(0, in_buf.data(), in_buf.size());
+			in_buf.resize(ret);
 
 			volatile uint8_t* in_ptr = in_buf.data();
 			{

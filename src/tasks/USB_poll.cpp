@@ -29,8 +29,6 @@
 
 #include "freertos_cpp_util/logging/Global_logger.hpp"
 
-#include "tusb.h"
-
 using freertos_util::logging::LOG_LEVEL;
 
 void USB_core_task::work()
@@ -45,11 +43,17 @@ void USB_core_task::work()
 
 void USB_core_task::wait_for_usb_rx_avail()
 {
+	while( RX_AVAIL_BIT != m_events.wait_bits(RX_AVAIL_BIT, true, true, portMAX_DELAY) )
+	{
 
+	}
 }
 void USB_core_task::wait_for_usb_tx_complete()
 {
+	while( TX_COMPL_BIT != m_events.wait_bits(TX_COMPL_BIT, true, true, portMAX_DELAY) )
+	{
 
+	}
 }
 
 extern "C"
@@ -275,17 +279,12 @@ extern "C"
 	// RX complete data available
 	void tud_cdc_rx_cb(uint8_t itf)
 	{
-		// TODO wake USB_rx_buffer_task
-		// TODO wake USB_lawicel_task and remove USB_rx_buffer_task, have USB_lawicel_task directly do IO
-		// usb_rx_buffer_task.get_mutex();
-		// usb_rx_buffer_task.notify_usb_read_ready();
+		usb_core_task.m_events.set_bits(USB_core_task::RX_AVAIL_BIT);
 	}
 
 	// TX complete space available
 	void tud_cdc_tx_complete_cb(uint8_t itf)
 	{
-		// TODO wake USB_tx_buffer_task
-		// TODO wake USB_lawicel_task and remove USB_tx_buffer_task, have USB_lawicel_task directly do IO
-		// usb_tx_buffer_task.tx_space_available();
+		usb_core_task.m_events.set_bits(USB_core_task::TX_COMPL_BIT);
 	}
 }
