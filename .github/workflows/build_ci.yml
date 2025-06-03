@@ -11,7 +11,10 @@ on:
     branches:
       - '**'
 env:
-  DOCKER_REPO: docker.pkg.github.com/suburbanembedded/hadoucan-bootloader-fw/hadoucan-bootloader-fw-tools
+  REGISTRY: ghcr.io
+  BRANCH_NAME: ${{ github.head_ref || github.ref_name }} 
+  DOCKER_REPO: ghcr.io/${{ github.repository }}/hadoucan-bootloader-fw-ci
+  DOCKER_REPO_CACHE: ghcr.io/${{ github.repository }}/hadoucan-bootloader-fw-ci-cache
 
 jobs:
   build:
