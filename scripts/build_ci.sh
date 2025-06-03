@@ -14,7 +14,7 @@ docker stop $CONTAINER_ID
 
 pushd $GITHUB_WORKSPACE/build/ram/debug/
 ls -la
-id
+
 sha256sum -b stm32h7_qspi_boot.elf stm32h7_qspi_boot.hex stm32h7_qspi_boot.bin | tee sha256.txt
 tar -czf $GITHUB_WORKSPACE/stm32h7_qspi_boot-debug-ram-$GITHUB_SHA.tar.gz    stm32h7_qspi_boot.elf stm32h7_qspi_boot.hex stm32h7_qspi_boot.bin sha256.txt
 popd

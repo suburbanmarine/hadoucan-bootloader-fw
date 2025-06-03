@@ -69,9 +69,27 @@ SECTIONS
   .isr_vector :
   {
     . = ALIGN(512);
+    start_isr_vector = .;
     KEEP(*(.isr_vector)) /* Startup code */
     . = ALIGN(4);
+    end_isr_vector = .;
   } >AXI_D1_SRAM
+
+  /* The OS goes in ITCM */
+  .ram_itcm : ALIGN(4)
+  {
+    . = ALIGN(4);
+    start_ram_itcm = .;
+    *(.ram_itcm)
+    /*
+    ../external/STM32CubeH7_cmake/libfreertos_v10.a(.text .text*)
+    ../external/STM32CubeH7_cmake/libfreertos_v10_cmsis.a(.text .text*)
+    ../external/STM32CubeH7_cmake/libfreertos_v10_heap4.a(.text .text*)
+    */
+    . = ALIGN(4);
+    end_ram_itcm = .;
+  } >ITCMRAM AT> AXI_D1_SRAM
+  start_ram_itcm_laddr = LOADADDR(.ram_itcm);
 
   /* The program code and other data goes into FLASH */
   .text :
@@ -172,6 +190,7 @@ SECTIONS
   /* RAM sections */
   .ram_dtcm : ALIGN(4)
   {
+    . = ALIGN(4);
     start_ram_dtcm = .;
     *(.ram_dtcm)
     . = ALIGN(4);
@@ -181,6 +200,7 @@ SECTIONS
   
   .ram_dtcm_noload (NOLOAD) : ALIGN(4)
   {
+    . = ALIGN(4);
     start_ram_dtcm_noload = .;
     *(.ram_dtcm_noload)
     . = ALIGN(4);
@@ -189,6 +209,7 @@ SECTIONS
 
   .ram_d1_s0 : ALIGN(4)
   {
+    . = ALIGN(4);
     start_ram_d1_s0 = .;
     *(.ram_d1_s0)
     . = ALIGN(4);
@@ -198,6 +219,7 @@ SECTIONS
 
   .ram_d1_s0_noload (NOLOAD) : ALIGN(4)
   {
+    . = ALIGN(4);
     start_ram_d1_s0_noload = .;
     *(.ram_d1_s0_noload)
     . = ALIGN(4);
@@ -206,6 +228,7 @@ SECTIONS
 
   .ram_d2_s1 : ALIGN(4)
   {
+    . = ALIGN(4);
     start_ram_d2_s1 = .;
     *(.ram_d2_s1)
     . = ALIGN(4);
@@ -215,6 +238,7 @@ SECTIONS
   
   .ram_d2_s1_noload (NOLOAD) : ALIGN(4)
   {
+    . = ALIGN(4);
     start_ram_d2_s1_noload = .;
     *(.ram_d2_s1_noload)
     . = ALIGN(4);
@@ -223,6 +247,7 @@ SECTIONS
 
   .ram_d2_s2 : ALIGN(4)
   {
+    . = ALIGN(4);
     start_ram_d2_s2 = .;
     *(.ram_d2_s2)
     . = ALIGN(4);
@@ -232,6 +257,7 @@ SECTIONS
 
   .ram_d2_s2_noload (NOLOAD) : ALIGN(4)
   {
+    . = ALIGN(4);
     start_ram_d2_s2_noload = .;
     *(.ram_d2_s2_noload)
     . = ALIGN(4);
@@ -240,6 +266,7 @@ SECTIONS
 
   .ram_d2_s3 : ALIGN(4)
   {
+    . = ALIGN(4);
     start_ram_d2_s3 = .;
     *(.ram_d2_s3)
     . = ALIGN(4);
@@ -249,6 +276,7 @@ SECTIONS
   
   .ram_d2_s3_noload (NOLOAD) : ALIGN(4)
   {
+    . = ALIGN(4);
     start_ram_d2_s3_noload = .;
     *(.ram_d2_s3_noload)
     . = ALIGN(4);
@@ -257,6 +285,7 @@ SECTIONS
 
   .ram_d3_s4 : ALIGN(4)
   {
+    . = ALIGN(4);
     start_ram_d3_s4 = .;
     *(.ram_d3_s4)
     . = ALIGN(4);
@@ -266,6 +295,7 @@ SECTIONS
   
   .ram_d3_s4_noload (NOLOAD) : ALIGN(4)
   {
+    . = ALIGN(4);
     start_ram_d3_s4_noload = .;
     *(.ram_d3_s4_noload)
     . = ALIGN(4);
@@ -274,6 +304,7 @@ SECTIONS
 
   .bbram : ALIGN(4)
   {
+    . = ALIGN(4);
     start_bbram = .;
     *(.bbram)
     . = ALIGN(4);
@@ -283,6 +314,7 @@ SECTIONS
   
   .bbram_noload (NOLOAD) : ALIGN(4)
   {
+    . = ALIGN(4);
     start_bbram_noload = .;
     *(.bbram_noload)
     . = ALIGN(4);

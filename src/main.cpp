@@ -3,8 +3,7 @@
 
 // #include "uart1_printf.hpp"
 
-#include "tasks/Bootloader_task.hpp"
-#include "tasks/LED_task.hpp"
+#include "global_inst.hpp"
 
 #include "freertos_cpp_util/Task_static.hpp"
 
@@ -13,9 +12,6 @@
 
 #include <array>
 #include <cinttypes>
-
-Bootloader_task    bootloader_task    __attribute__ (( section(".ram_dtcm_noload") ));
-LED_task           led_task           __attribute__ (( section(".ram_dtcm_noload") ));
 
 void set_gpio_low_power(GPIO_TypeDef* const gpio)
 {
@@ -325,7 +321,7 @@ int main(void)
 	HAL_Init();
 
 	//TODO: fix this to keep JTAG/SWD on, maybe
-	set_all_gpio_low_power();
+	// set_all_gpio_low_power();
 
 	SystemClock_Config();
 

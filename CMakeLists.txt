@@ -6,6 +6,8 @@ get_git_head_revision(GIT_REFSPEC GIT_SHA1)
 
 project(stm32h7_qspi_boot C CXX ASM)
 
+set(STM32CUBEH7_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/STM32CubeH7)
+
 add_definitions(
 	-DSTM32H750xx
 	-D__weak=__attribute__\(\(weak\)\)
@@ -13,6 +15,7 @@ add_definitions(
 
 	-DUSE_HAL_DRIVER
 	-DHSE_VALUE=\(\(uint32_t\)24000000\)
+	-DUSE_PWR_LDO_SUPPLY
 
 	-DWORD_SIZE=4
 
@@ -32,18 +35,47 @@ include_directories(
 	external/mbedtls/include
 )
 
-add_subdirectory(external/stm32cube_fw_h7_v1_4_0)
-add_subdirectory(external/tinyxml2)
-add_subdirectory(external/mbedtls)
+add_library(tinyusb_config INTERFACE)
+target_include_directories(tinyusb_config
+	INTERFACE
+		hadoucan-fw/include
+)
+target_compile_definitions(tinyusb_config
+	INTERFACE
+		CFG_TUSB_MCU=OPT_MCU_STM32H7
+)
+target_link_libraries(tinyusb_config
+	INTERFACE
+		freertos_v10
+)
+
+add_library(tinyusb_dcd
+	external/tinyusb/src/portable/synopsys/dwc2/dcd_dwc2.c
+	external/tinyusb/src/portable/synopsys/dwc2/dwc2_common.c
+)
+target_include_directories(tinyusb_dcd
+	PUBLIC
+		external/tinyusb/src
+)
+target_link_libraries(tinyusb_dcd
+	PUBLIC
+		tinyusb
+		tinyusb_config
+		stm32h750xx_cmsis
+)
 
 add_subdirectory(external/crc)
-add_subdirectory(external/freertos_cpp_util)
-add_subdirectory(external/common_util)
+add_subdirectory(external/mbedtls)
+add_subdirectory(external/STM32CubeH7_cmake)
+add_subdirectory(external/tinyusb/src)
+add_subdirectory(external/tinyxml2)
+
 add_subdirectory(external/bootloader_util)
+add_subdirectory(external/common_util)
 add_subdirectory(external/emb_fs_util)
+add_subdirectory(external/freertos_cpp_util)
 add_subdirectory(external/mbedtls_util)
 add_subdirectory(external/tinyxml2_util)
-add_subdirectory(external/libusb_dev_cpp)
 
 add_library(spiffs
 	external/spiffs/src/spiffs_cache.c
@@ -75,7 +107,6 @@ add_executable(stm32h7_qspi_boot.elf
 	src/hal_inst.c
 	src/sw_ver.cpp
 	
-	src/tasks/USB_tx_buffer_task.cpp
 	src/tasks/USB_rx_buffer_task.cpp
 	src/tasks/Bootloader_task.cpp
 	src/tasks/LED_task.cpp
@@ -115,16 +146,17 @@ target_link_libraries(stm32h7_qspi_boot.elf
 	stm32h7xx_ll
 	stm32h750xx_cmsis
 
-	freertos_v10_heap4
 	freertos_v10
+	freertos_v10_heap4
 	freertos_v10_cmsis
 
 	bootloader_util
 	common_util
 	freertos_cpp_util
 
-	usb_dev_cpp
-	usb_dev_cpp_stm32
+	tinyusb
+	tinyusb_config
+	tinyusb_dcd
 
 	spi_flash
 	spiffs_flash
@@ -146,7 +178,7 @@ target_link_libraries(stm32h7_qspi_boot.elf
 # Generate intel hex image
 add_custom_command(
 	OUTPUT stm32h7_qspi_boot.hex
-	COMMAND ${ATOLLIC_PATH}/arm-atollic-eabi-objcopy -Oihex stm32h7_qspi_boot.elf stm32h7_qspi_boot.hex
+	COMMAND arm-none-eabi-objcopy -Oihex stm32h7_qspi_boot.elf stm32h7_qspi_boot.hex
 	DEPENDS stm32h7_qspi_boot.elf
 	WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 	VERBATIM	
@@ -161,7 +193,7 @@ add_custom_target(stm32h7_qspi_boot_hex
 # Generate raw image
 add_custom_command(
 	OUTPUT stm32h7_qspi_boot.bin
-	COMMAND ${ATOLLIC_PATH}/arm-atollic-eabi-objcopy -S -Obinary stm32h7_qspi_boot.elf stm32h7_qspi_boot.bin
+	COMMAND arm-none-eabi-objcopy -S -Obinary stm32h7_qspi_boot.elf stm32h7_qspi_boot.bin
 	DEPENDS stm32h7_qspi_boot.elf
 	WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 	VERBATIM	
@@ -177,7 +209,7 @@ add_custom_target(stm32h7_qspi_boot_bin
 # Print the image size
 add_custom_target(stm32h7_qspi_boot_size
 	ALL
-	COMMAND ${ATOLLIC_PATH}/arm-atollic-eabi-size --format=sysv stm32h7_qspi_boot.elf
+	COMMAND arm-none-eabi-size --format=sysv stm32h7_qspi_boot.elf
 	DEPENDS stm32h7_qspi_boot.elf
 	WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 	VERBATIM

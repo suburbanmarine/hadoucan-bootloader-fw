@@ -9,11 +9,7 @@
 
 #include "Fastboot.hpp"
 
-#include "USB_tx_buffer_task.hpp"
-#include "USB_rx_buffer_task.hpp"
-
-#include "libusb_dev_cpp/core/usb_core.hpp"
-#include "libusb_dev_cpp/util/Descriptor_table.hpp"
+#include "freertos_cpp_util/Task_static.hpp"
 
 #include "tinyxml2/tinyxml2.h"
 
@@ -70,15 +66,7 @@ protected:
 	W25Q16JV m_qspi;
 	W25Q16JV_app_region m_fs;
 
-	static bool handle_usb_set_config_thunk(void* ctx, const uint16_t config);
-	bool handle_usb_set_config(const uint8_t config);
-
-	Descriptor_table usb_desc_table;
 	std::array<char, 25> usb_id_str;
-	Buffer_adapter_rx m_rx_buf_adapter;
-	std::vector<uint8_t> m_rx_buf;
-	Buffer_adapter_tx m_tx_buf_adapter;
-	std::vector<uint8_t> m_tx_buf;
 
 	Fastboot m_fastboot;
 

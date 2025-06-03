@@ -69,9 +69,27 @@ SECTIONS
   .isr_vector :
   {
     . = ALIGN(512);
+    start_isr_vector = .;
     KEEP(*(.isr_vector)) /* Startup code */
     . = ALIGN(4);
+    end_isr_vector = .;
   } >FLASH
+
+  /* The OS goes in ITCM */
+  .ram_itcm : ALIGN(4)
+  {
+    . = ALIGN(4);
+    start_ram_itcm = .;
+    *(.ram_itcm)
+    /*
+    ../external/STM32CubeH7_cmake/libfreertos_v10.a(.text .text*)
+    ../external/STM32CubeH7_cmake/libfreertos_v10_cmsis.a(.text .text*)
+    ../external/STM32CubeH7_cmake/libfreertos_v10_heap4.a(.text .text*)
+    */
+    . = ALIGN(4);
+    end_ram_itcm = .;
+  } >ITCMRAM AT> AXI_D1_SRAM
+  start_ram_itcm_laddr = LOADADDR(.ram_itcm);
 
   /* The program code and other data goes into FLASH */
   .text :

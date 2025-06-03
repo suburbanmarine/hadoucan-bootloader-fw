@@ -84,7 +84,7 @@ void Fastboot::process(const std::vector<uint8_t>& in_packet, std::vector<uint8_
 		}
 		else
 		{
-			logger->log(LOG_LEVEL::ERROR, "Fastboot", "Unknown command %.*s", in_packet.size(), in_packet.data());
+			logger->log(LOG_LEVEL::error, "Fastboot", "Unknown command %.*s", in_packet.size(), in_packet.data());
 			resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());		
 		}
 	}
@@ -109,7 +109,7 @@ void Fastboot::handle_download(const std::vector<uint8_t>& in_packet, std::vecto
 		auto it = std::find(in_packet.begin(), in_packet.end(), ':');
 		if(it == in_packet.end())
 		{
-			logger->log(LOG_LEVEL::ERROR, "Fastboot", "handle_download fail, no :");
+			logger->log(LOG_LEVEL::error, "Fastboot", "handle_download fail, no :");
 			resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());
 			return;
 		}
@@ -127,7 +127,7 @@ void Fastboot::handle_download(const std::vector<uint8_t>& in_packet, std::vecto
 		unsigned size_in = 0;
 		if(sscanf(digit_str.c_str(), "%x", &size_in) != 1)
 		{
-			logger->log(LOG_LEVEL::ERROR, "Fastboot", "handle_download fail, sscanf fail");
+			logger->log(LOG_LEVEL::error, "Fastboot", "handle_download fail, sscanf fail");
 			resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());
 			return;	
 		}
@@ -155,12 +155,12 @@ void Fastboot::handle_download(const std::vector<uint8_t>& in_packet, std::vecto
 				resp->push_back('T');
 				resp->push_back('A');
 
-				logger->log(LOG_LEVEL::DEBUG, "Fastboot", "Download start: %" PRId32, uint32_t(size_in));
+				logger->log(LOG_LEVEL::debug, "Fastboot", "Download start: %" PRId32, uint32_t(size_in));
 				resp->insert(resp->end(), hex_str.begin(), std::prev(hex_str.end()));
 			}
 			else
 			{
-				logger->log(LOG_LEVEL::ERROR, "Fastboot", "handle_download fail, snprintf fail");
+				logger->log(LOG_LEVEL::error, "Fastboot", "handle_download fail, snprintf fail");
 				resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());
 			}			
 		}
@@ -174,7 +174,7 @@ void Fastboot::handle_download(const std::vector<uint8_t>& in_packet, std::vecto
 
 		if(m_curr_off == m_size)
 		{
-			logger->log(LOG_LEVEL::DEBUG, "Fastboot", "Download complete");
+			logger->log(LOG_LEVEL::debug, "Fastboot", "Download complete");
 
 			set_state(Fastboot_state::LINE_MODE);
 			resp->assign(RESP_OKAY.begin(), RESP_OKAY.end());
@@ -182,21 +182,21 @@ void Fastboot::handle_download(const std::vector<uint8_t>& in_packet, std::vecto
 	}
 	else
 	{
-		logger->log(LOG_LEVEL::ERROR, "Fastboot", "handle_download fail, state fail");
+		logger->log(LOG_LEVEL::error, "Fastboot", "handle_download fail, state fail");
 		resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());		
 	}
 }
 void Fastboot::handle_verify(const std::vector<uint8_t>& in_packet, std::vector<uint8_t>* resp)
 {
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
-	logger->log(LOG_LEVEL::INFO, "Fastboot", "handle_verify");
+	logger->log(LOG_LEVEL::info, "Fastboot", "handle_verify");
 	resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());
 }
 void Fastboot::handle_flash(const std::vector<uint8_t>& in_packet, std::vector<uint8_t>* resp)
 {
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 
-	logger->log(LOG_LEVEL::INFO, "Fastboot", "handle_flash");
+	logger->log(LOG_LEVEL::info, "Fastboot", "handle_flash");
 
 	resp->clear();
 
@@ -224,31 +224,31 @@ void Fastboot::handle_flash(const std::vector<uint8_t>& in_packet, std::vector<u
 		}
 	}
 
-	logger->log(LOG_LEVEL::INFO, "Fastboot", "Starting to write file \"%s\"", flash_name.c_str());
+	logger->log(LOG_LEVEL::info, "Fastboot", "Starting to write file \"%s\"", flash_name.c_str());
 
 	spiffs_file fd = SPIFFS_open(m_fs->get_fs(), flash_name.c_str(), SPIFFS_CREAT | SPIFFS_TRUNC | SPIFFS_RDWR, 0);
 	if(fd < 0)
 	{
-		logger->log(LOG_LEVEL::ERROR, "Fastboot", "Opening file \"%s\" failed: %" PRId32, flash_name.c_str(), SPIFFS_errno(m_fs->get_fs()));
+		logger->log(LOG_LEVEL::error, "Fastboot", "Opening file \"%s\" failed: %" PRId32, flash_name.c_str(), SPIFFS_errno(m_fs->get_fs()));
 		resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());
 		return;
 	}
 
 	if(SPIFFS_write(m_fs->get_fs(), fd, (u8_t *)m_addr, m_size) < 0)
 	{
-		logger->log(LOG_LEVEL::ERROR, "Fastboot", "Writing file \"%s\" failed: %" PRId32, flash_name.c_str(), SPIFFS_errno(m_fs->get_fs()));
+		logger->log(LOG_LEVEL::error, "Fastboot", "Writing file \"%s\" failed: %" PRId32, flash_name.c_str(), SPIFFS_errno(m_fs->get_fs()));
 		resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());
 		return;
 	}
 
 	if(SPIFFS_close(m_fs->get_fs(), fd) < 0)
 	{
-		logger->log(LOG_LEVEL::ERROR, "Fastboot", "Closing file \"%s\" failed: %" PRId32, flash_name.c_str(), SPIFFS_errno(m_fs->get_fs()));
+		logger->log(LOG_LEVEL::error, "Fastboot", "Closing file \"%s\" failed: %" PRId32, flash_name.c_str(), SPIFFS_errno(m_fs->get_fs()));
 		resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());
 		return;
 	}
 
-	logger->log(LOG_LEVEL::INFO, "Fastboot", "Wrote \"%s\" OK", flash_name.c_str());
+	logger->log(LOG_LEVEL::info, "Fastboot", "Wrote \"%s\" OK", flash_name.c_str());
 
 	resp->assign(RESP_OKAY.begin(), RESP_OKAY.end());
 }
@@ -256,7 +256,7 @@ void Fastboot::handle_erase(const std::vector<uint8_t>& in_packet, std::vector<u
 {
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 
-	logger->log(LOG_LEVEL::INFO, "Fastboot", "handle_erase");
+	logger->log(LOG_LEVEL::info, "Fastboot", "handle_erase");
 
 	resp->clear();
 
@@ -284,16 +284,16 @@ void Fastboot::handle_erase(const std::vector<uint8_t>& in_packet, std::vector<u
 		}
 	}
 
-	logger->log(LOG_LEVEL::INFO, "Fastboot", "Starting to remove file %s", flash_name.c_str());
+	logger->log(LOG_LEVEL::info, "Fastboot", "Starting to remove file %s", flash_name.c_str());
 
 	if(SPIFFS_remove(m_fs->get_fs(), flash_name.c_str()) < 0)
 	{
-		logger->log(LOG_LEVEL::ERROR, "Fastboot", "Remove file %s failed: %" PRId32, flash_name.c_str(), SPIFFS_errno(m_fs->get_fs()));
+		logger->log(LOG_LEVEL::error, "Fastboot", "Remove file %s failed: %" PRId32, flash_name.c_str(), SPIFFS_errno(m_fs->get_fs()));
 		resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());
 		return;
 	}
 
-	logger->log(LOG_LEVEL::INFO, "Fastboot", "Erase %s OK", flash_name.c_str());
+	logger->log(LOG_LEVEL::info, "Fastboot", "Erase %s OK", flash_name.c_str());
 
 	resp->assign(RESP_OKAY.begin(), RESP_OKAY.end());
 }
@@ -301,34 +301,34 @@ void Fastboot::handle_format(const std::vector<uint8_t>& in_packet, std::vector<
 {
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 
-	logger->log(LOG_LEVEL::INFO, "Fastboot", "handle_format");
+	logger->log(LOG_LEVEL::info, "Fastboot", "handle_format");
 
-	logger->log(LOG_LEVEL::INFO, "Fastboot", "Unmount flash fs");
+	logger->log(LOG_LEVEL::info, "Fastboot", "Unmount flash fs");
 	m_fs->unmount();
 
-	logger->log(LOG_LEVEL::INFO, "Fastboot", "Start format flash fs");
+	logger->log(LOG_LEVEL::info, "Fastboot", "Start format flash fs");
 	int format_ret = m_fs->format();
 	if(format_ret != SPIFFS_OK)
 	{
-		logger->log(LOG_LEVEL::ERROR, "Fastboot", "SPIFFS format failed: %d", format_ret);
+		logger->log(LOG_LEVEL::error, "Fastboot", "SPIFFS format failed: %d", format_ret);
 		if(format_ret == -1)
 		{
-			logger->log(LOG_LEVEL::ERROR, "Fastboot", "SPIFFS errno: %d", SPIFFS_errno(m_fs->get_fs()));
+			logger->log(LOG_LEVEL::error, "Fastboot", "SPIFFS errno: %d", SPIFFS_errno(m_fs->get_fs()));
 		}
 		resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());
 		return;
 	}
 
-	logger->log(LOG_LEVEL::INFO, "Fastboot", "Re-mounting flash fs");
+	logger->log(LOG_LEVEL::info, "Fastboot", "Re-mounting flash fs");
 	int mount_ret = m_fs->mount();
 	if(mount_ret != SPIFFS_OK)
 	{
-		logger->log(LOG_LEVEL::ERROR, "Fastboot", "Re-mounting failed: %d", mount_ret);
+		logger->log(LOG_LEVEL::error, "Fastboot", "Re-mounting failed: %d", mount_ret);
 		resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());
 		return;
 	}
 
-	logger->log(LOG_LEVEL::INFO, "Fastboot", "Re-mounting flash fs ok");
+	logger->log(LOG_LEVEL::info, "Fastboot", "Re-mounting flash fs ok");
 
 	resp->assign(RESP_OKAY.begin(), RESP_OKAY.end());
 }
@@ -336,7 +336,7 @@ void Fastboot::handle_boot(const std::vector<uint8_t>& in_packet, std::vector<ui
 {
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 
-	logger->log(LOG_LEVEL::INFO, "Fastboot", "handle_boot");
+	logger->log(LOG_LEVEL::info, "Fastboot", "handle_boot");
 
 	handle_reboot(in_packet, resp);
 }
@@ -344,7 +344,7 @@ void Fastboot::handle_continue(const std::vector<uint8_t>& in_packet, std::vecto
 {
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 
-	logger->log(LOG_LEVEL::INFO, "Fastboot", "handle_continue");
+	logger->log(LOG_LEVEL::info, "Fastboot", "handle_continue");
 
 	handle_reboot(in_packet, resp);
 }
@@ -352,7 +352,7 @@ void Fastboot::handle_reboot(const std::vector<uint8_t>& in_packet, std::vector<
 {
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 
-	logger->log(LOG_LEVEL::INFO, "Fastboot", "handle_reboot");
+	logger->log(LOG_LEVEL::info, "Fastboot", "handle_reboot");
 
 	resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());
 
@@ -385,7 +385,7 @@ void Fastboot::handle_reboot_bootloader(const std::vector<uint8_t>& in_packet, s
 {
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 
-	logger->log(LOG_LEVEL::INFO, "Fastboot", "handle_reboot_bootloader");
+	logger->log(LOG_LEVEL::info, "Fastboot", "handle_reboot_bootloader");
 
 	resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());
 
@@ -418,7 +418,7 @@ void Fastboot::handle_powerdown(const std::vector<uint8_t>& in_packet, std::vect
 {
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 	
-	logger->log(LOG_LEVEL::INFO, "Fastboot", "handle_powerdown");
+	logger->log(LOG_LEVEL::info, "Fastboot", "handle_powerdown");
 
 	resp->assign(RESP_FAIL.begin(), RESP_FAIL.end());
 }
