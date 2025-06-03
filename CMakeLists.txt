@@ -33,6 +33,10 @@ include_directories(
 	include
 	external/
 	external/mbedtls/include
+add_library(freertos_v10_config INTERFACE)
+target_include_directories(freertos_v10_config
+	INTERFACE
+		include
 )
 
 add_library(tinyusb_config INTERFACE)
