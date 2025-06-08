@@ -30,7 +30,7 @@
 #endif
 
 #define CFG_TUD_DFU              1
-#define CFG_TUD_DFU_XFER_BUFSIZE (TUD_OPT_HIGH_SPEED ? 512 : 64)
+#define CFG_TUD_DFU_XFER_BUFSIZE 512
 
 #ifdef __cplusplus
  }

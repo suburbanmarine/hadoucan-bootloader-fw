@@ -263,45 +263,66 @@ extern "C"
 	}
 	void tud_dfu_download_cb(uint8_t alt, uint16_t block_num, uint8_t const *data, uint16_t length)
 	{
-		size_t block_size = 0;
-		switch(tud_speed_get())
+		if(block_num == 0)
 		{
-			case TUSB_SPEED_FULL:
+			if(m_fd >= 0)
 			{
-				block_size = 64;
-				break;
+				if(SPIFFS_close(m_fs->get_fs(), m_fd) < 0)
+				{
+					tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+					return;
+				}
+
+				m_fd = 0;
 			}
-			case TUSB_SPEED_HIGH:
+
+			m_fd = SPIFFS_open(m_fs->get_fs(), flash_name.c_str(), SPIFFS_CREAT | SPIFFS_TRUNC | SPIFFS_RDWR, 0);
+			if(fd < 0)
 			{
-				block_size = 512;
-				break;
-			}
-			default:
-			{
-				break;
+				tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+				return;
 			}
 		}
 
-		if(block_size == 0)
+		if(m_fd <= 0)
 		{
-			tud_dfu_finish_flashing(DFU_STATUS_ERR_UNKNOWN);
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
 			return;
 		}
 
-		const size_t offset = size_t(block_num) * block_size;
-
+		// copy in
+		const size_t offset = size_t(block_num) * m_download_block_size;
 		memcpy(m_download_base + offset, data, length);
 
 		// Commit to flash
-		// DFU_STATUS_ERR_PROG
-
-		tud_dfu_finish_flashing(DFU_STATUS_OK);
+		if(SPIFFS_write(m_fs->get_fs(), m_fd, data, length) < 0)
+		{
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
+		}
+		else
+		{
+			tud_dfu_finish_flashing(DFU_STATUS_OK);
+		}
 	}
 	void tud_dfu_manifest_cb(uint8_t alt)
 	{
-		// Close file
+		if(m_fd <= 0)
+		{
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+			return;
+		}
 
-		tud_dfu_finish_flashing(DFU_STATUS_OK);
+		// Close file
+		if(SPIFFS_close(m_fs->get_fs(), m_fd) < 0)
+		{
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
+		}
+		else
+		{
+			tud_dfu_finish_flashing(DFU_STATUS_OK);
+		}
+
+		m_fd = 0;
 	}
 	uint16_t tud_dfu_upload_cb(uint8_t alt, uint16_t block_num, uint8_t* data, uint16_t length)
 	{
