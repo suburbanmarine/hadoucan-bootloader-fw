@@ -214,6 +214,9 @@ void Bootloader_task::handle_tud_dfu_detach_cb(void)
 		: /* no in */
 		: "memory"
 		);
+
+	SCB_DisableDCache();
+	SCB_DisableICache();
 	
 	NVIC_SystemReset();
 }
@@ -234,6 +237,9 @@ void Bootloader_task::handle_tud_dfu_abort_cb(uint8_t alt)
 		: /* no in */
 		: "memory"
 		);
+
+	SCB_DisableDCache();
+	SCB_DisableICache();
 	
 	NVIC_SystemReset();
 }
@@ -313,8 +319,8 @@ void Bootloader_task::work()
 			{
 				asm volatile(
 					"cpsid i\n"
-					"dsb 0xF\n"
-					"isb 0xF\n"
+					"isb sy\n"
+					"dsb sy\n"
 					: /* no out */
 					: /* no in */
 					: "memory"
