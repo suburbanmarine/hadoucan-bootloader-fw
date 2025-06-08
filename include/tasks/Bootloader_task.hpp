@@ -3,8 +3,6 @@
 #include "W25Q16JV.hpp"
 #include "W25Q16JV_app_region.hpp"
 
-#include "crc/crc_32c.hpp"
-
 #include "bootloader_util/Bootloader_key.hpp"
 
 #include "freertos_cpp_util/Task_static.hpp"
