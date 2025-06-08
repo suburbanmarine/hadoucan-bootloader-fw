@@ -32,8 +32,6 @@ extern "C"
 	#define USB_PID   0x6666
 	#define USB_BCD   0x0200
 
-	#define ITF_NUM_DFU_MODE 0
-
 	#define EPNUM_CDC_NOTIF   0x81
 	#define EPNUM_CDC_OUT     0x02
 	#define EPNUM_CDC_IN      0x82
@@ -48,15 +46,20 @@ extern "C"
 	#define DFU_FUNC_ATTRS (DFU_ATTR_CAN_UPLOAD | DFU_ATTR_CAN_DOWNLOAD | DFU_ATTR_MANIFESTATION_TOLERANT)
 	#define DFU_ALT_COUNT 1
 
+	#define ITF_NUM_DFU_MODE 0
+	#define ITF_COUNT        1
+
+	#define CONFIG_TOTAL_LEN TUD_CONFIG_DESC_LEN + TUD_DFU_DESC_LEN(DFU_ALT_COUNT)
+
 	uint8_t const desc_fs_configuration[] =
 	{
-		TUD_CONFIG_DESCRIPTOR(1, 2, 0, TUD_CONFIG_DESC_LEN + TUD_DFU_DESC_LEN(DFU_ALT_COUNT), 0x00, 100),
+		TUD_CONFIG_DESCRIPTOR(1, ITF_COUNT, 0, CONFIG_TOTAL_LEN, 0x00, 100),
 		TUD_DFU_DESCRIPTOR(ITF_NUM_DFU_MODE, DFU_ALT_COUNT, 4, DFU_FUNC_ATTRS, 1000, 64),
 	};
 
 	uint8_t const desc_hs_configuration[] =
 	{
-		TUD_CONFIG_DESCRIPTOR(1, 2, 0, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN, 0x00, 100),
+		TUD_CONFIG_DESCRIPTOR(1, ITF_COUNT, 0, CONFIG_TOTAL_LEN, 0x00, 100),
 		TUD_DFU_DESCRIPTOR(ITF_NUM_DFU_MODE, DFU_ALT_COUNT, 4, DFU_FUNC_ATTRS, 1000, 512),
 	};
 
@@ -65,9 +68,9 @@ extern "C"
 		.bDescriptorType    = TUSB_DESC_DEVICE,
 		.bcdUSB             = USB_BCD,
 
-		.bDeviceClass       = TUSB_CLASS_MISC,
-		.bDeviceSubClass    = MISC_SUBCLASS_COMMON,
-		.bDeviceProtocol    = MISC_PROTOCOL_IAD,
+		.bDeviceClass       = 0x00,
+		.bDeviceSubClass    = 0x00,
+		.bDeviceProtocol    = 0x00,
 
 		.bMaxPacketSize0    = CFG_TUD_ENDPOINT0_SIZE,
 
@@ -117,7 +120,7 @@ extern "C"
 		"Suburban Marine, Inc.",       // 1: Manufacturer
 		"HadouCAN Bootloader",         // 2: Product
 		NULL,                          // 3: SN
-		"HadouCAN CDC"                 // 4: CDC Interface
+		"FLASH"                        // 4: DFU ALT 0
 	};
 
 	void ascii_to_u16le(const size_t len, char const * const in, uint16_t* const out)
@@ -177,9 +180,9 @@ extern "C"
 	  .bDescriptorType    = TUSB_DESC_DEVICE_QUALIFIER,
 	  .bcdUSB             = USB_BCD,
 
-	  .bDeviceClass       = TUSB_CLASS_MISC,
-	  .bDeviceSubClass    = MISC_SUBCLASS_COMMON,
-	  .bDeviceProtocol    = MISC_PROTOCOL_IAD,
+	  .bDeviceClass       = 0x00,
+	  .bDeviceSubClass    = 0x00,
+	  .bDeviceProtocol    = 0x00,
 
 	  .bMaxPacketSize0    = CFG_TUD_ENDPOINT0_SIZE,
 	  .bNumConfigurations = 0x01,
@@ -190,19 +193,19 @@ extern "C"
 		return (uint8_t const*) &desc_device_qualifier;
 	}
 
-	uint8_t desc_other_speed_config[TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN];
+	uint8_t desc_other_speed_config[CONFIG_TOTAL_LEN];
 	uint8_t const* tud_descriptor_other_speed_configuration_cb(uint8_t index)
 	{
 		switch(tud_speed_get())
 		{
 			case TUSB_SPEED_FULL:
 			{
-				memcpy(desc_other_speed_config, desc_hs_configuration, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN);
+				memcpy(desc_other_speed_config, desc_hs_configuration, CONFIG_TOTAL_LEN);
 				break;
 			}
 			case TUSB_SPEED_HIGH:
 			{
-				memcpy(desc_other_speed_config, desc_fs_configuration, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN);
+				memcpy(desc_other_speed_config, desc_fs_configuration, CONFIG_TOTAL_LEN);
 				break;
 			}
 			default:
@@ -246,7 +249,7 @@ extern "C"
 			}
 			case DFU_MANIFEST:
 			{
-				bwPollTimeout_ms = 0;
+				bwPollTimeout_ms = 1000;
 				break;
 			}
 			default:
@@ -260,11 +263,45 @@ extern "C"
 	}
 	void tud_dfu_download_cb(uint8_t alt, uint16_t block_num, uint8_t const *data, uint16_t length)
 	{
+		size_t block_size = 0;
+		switch(tud_speed_get())
+		{
+			case TUSB_SPEED_FULL:
+			{
+				block_size = 64;
+				break;
+			}
+			case TUSB_SPEED_HIGH:
+			{
+				block_size = 512;
+				break;
+			}
+			default:
+			{
+				break;
+			}
+		}
+
+		if(block_size == 0)
+		{
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_UNKNOWN);
+			return;
+		}
+
+		const size_t offset = size_t(block_num) * block_size;
+
+		memcpy(m_download_base + offset, data, length);
+
+		// Commit to flash
+		// DFU_STATUS_ERR_PROG
+
 		tud_dfu_finish_flashing(DFU_STATUS_OK);
 	}
 	void tud_dfu_manifest_cb(uint8_t alt)
 	{
+		// Close file
 
+		tud_dfu_finish_flashing(DFU_STATUS_OK);
 	}
 	uint16_t tud_dfu_upload_cb(uint8_t alt, uint16_t block_num, uint8_t* data, uint16_t length)
 	{
