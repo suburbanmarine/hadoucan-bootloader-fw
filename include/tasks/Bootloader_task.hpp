@@ -17,7 +17,7 @@ class Bootloader_task : public Task_static<2048>
 {
 public:
 
-	Bootloader_task()
+	Bootloader_task() : m_fd(-1)
 	{
 
 	}
