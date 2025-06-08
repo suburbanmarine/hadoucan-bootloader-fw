@@ -192,11 +192,41 @@ uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_n
 }
 void Bootloader_task::handle_tud_dfu_detach_cb(void)
 {
-	// TODO load_verify_bin_app_image or reboot
+	Bootloader_key boot_key;
+	boot_key.from_addr(reinterpret_cast<const uint8_t*>(0x38800000));
+
+	boot_key.bootloader_op = uint8_t(Bootloader_key::Bootloader_ops::RUN_APP);
+	boot_key.update_crc();
+	boot_key.to_addr(reinterpret_cast<uint8_t volatile *>(0x38800000));
+
+	asm volatile(
+		"isb sy\n"
+		"dsb sy\n"
+		: /* no out */
+		: /* no in */
+		: "memory"
+		);
+	
+	NVIC_SystemReset();
 }
 void Bootloader_task::handle_tud_dfu_abort_cb(uint8_t alt)
 {
-	// TODO ???
+	Bootloader_key boot_key;
+	boot_key.from_addr(reinterpret_cast<const uint8_t*>(0x38800000));
+	
+	boot_key.bootloader_op = uint8_t(Bootloader_key::Bootloader_ops::RUN_APP);
+	boot_key.update_crc();
+	boot_key.to_addr(reinterpret_cast<uint8_t volatile *>(0x38800000));
+
+	asm volatile(
+		"isb sy\n"
+		"dsb sy\n"
+		: /* no out */
+		: /* no in */
+		: "memory"
+		);
+	
+	NVIC_SystemReset();
 }
 
 void Bootloader_task::work()
@@ -370,6 +400,9 @@ void Bootloader_task::work()
 			boot_key.update_crc();
 		}
 	}
+
+	boot_key.bootloader_op = uint8_t(Bootloader_key::Bootloader_ops::RUN_BOOTLDR);
+	boot_key.update_crc();
 
 	m_fs.initialize();
 	m_fs.set_flash(&m_qspi);
