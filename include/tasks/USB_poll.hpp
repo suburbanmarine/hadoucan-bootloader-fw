@@ -9,19 +9,12 @@
 
 class USB_core_task : public Task_static<2048>
 {
+public:
+
 	friend void tud_suspend_cb(bool remote_wakeup_en);
 	friend void tud_resume_cb(void);
 	friend void tud_mount_cb(void);
 	friend void tud_umount_cb(void);
-
-	friend uint32_t tud_dfu_get_timeout_cb(uint8_t alt, uint8_t state);
-	friend void tud_dfu_download_cb (uint8_t alt, uint16_t block_num, uint8_t const *data, uint16_t length);
-	friend void tud_dfu_manifest_cb(uint8_t alt);
-	friend uint16_t tud_dfu_upload_cb(uint8_t alt, uint16_t block_num, uint8_t* data, uint16_t length);
-	friend void tud_dfu_detach_cb(void);
-	friend void tud_dfu_abort_cb(uint8_t alt);
-
-public:
 
 	USB_core_task()
 	{
@@ -30,16 +23,14 @@ public:
 
 	void work() override;
 
-	std::atomic<bool> m_attach;
-	
 private:
 
-	spiffs_file m_fd;
+	void handle_tud_suspend_cb(bool remote_wakeup_en);
+	void handle_tud_resume_cb(void);
+	void handle_tud_mount_cb(void);
+	void handle_tud_umount_cb(void);
 
-	uint8_t* const m_mem_base          = reinterpret_cast<uint8_t*>(0x24000000);
-	const size_t m_mem_size            = 512*1024*1024;
-	const size_t m_download_block_size = CFG_TUD_DFU_XFER_BUFSIZE;
-
-	const static EventBits_t DFU_ATTACH_BIT = 0x0001U;
+	const static EventBits_t USB_SUSPEND_BIT = 0x0002U;
+	const static EventBits_t USB_MOUNTED_BIT = 0x0001U;
 	Event_group_static m_events;
 };

@@ -29,6 +29,112 @@
 
 using freertos_util::logging::LOG_LEVEL;
 
+uint32_t Bootloader_task::handle_tud_dfu_get_timeout_cb(uint8_t alt, uint8_t state)
+{
+	uint32_t bwPollTimeout_ms = 0;
+
+	switch(state)
+	{
+		case DFU_DNBUSY:
+		{
+			bwPollTimeout_ms = 100;
+			break;
+		}
+		case DFU_MANIFEST:
+		{
+			bwPollTimeout_ms = 1000;
+			break;
+		}
+		default:
+		{
+			bwPollTimeout_ms = 0;
+			break;
+		}
+	}
+
+	return bwPollTimeout_ms;
+}
+void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num, uint8_t const *data, uint16_t length)
+{
+	if(block_num == 0)
+	{
+		if(m_fd >= 0)
+		{
+			if(SPIFFS_close(m_fs.get_fs(), m_fd) < 0)
+			{
+				tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+				return;
+			}
+
+			m_fd = 0;
+		}
+
+		m_fd = SPIFFS_open(m_fs.get_fs(), "app.bin.tmp", SPIFFS_CREAT | SPIFFS_TRUNC | SPIFFS_RDWR, 0);
+		if(m_fd < 0)
+		{
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+			return;
+		}
+	}
+
+	if(m_fd <= 0)
+	{
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+		return;
+	}
+
+	// copy in
+	const size_t offset = size_t(block_num) * m_download_block_size;
+	memcpy(m_mem_base + offset, data, length);
+
+	// Commit to flash
+	if(SPIFFS_write(m_fs.get_fs(), m_fd, (void*)data, length) < 0)
+	{
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
+	}
+	else
+	{
+		tud_dfu_finish_flashing(DFU_STATUS_OK);
+	}
+}
+void Bootloader_task::handle_tud_dfu_manifest_cb(uint8_t alt)
+{
+	if(m_fd <= 0)
+	{
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+		return;
+	}
+
+	// Close file
+	if(SPIFFS_close(m_fs.get_fs(), m_fd) < 0)
+	{
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
+		return;
+	}
+	m_fd = 0;
+
+	// Atomic rename file
+	if(SPIFFS_rename(m_fs.get_fs(), "app.bin.tmp", "app.bin") < 0)
+	{
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
+		return;
+	}
+
+	tud_dfu_finish_flashing(DFU_STATUS_OK);
+}
+uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_num, uint8_t* data, uint16_t length)
+{
+	return 0;
+}
+void Bootloader_task::handle_tud_dfu_detach_cb(void)
+{
+
+}
+void Bootloader_task::handle_tud_dfu_abort_cb(uint8_t alt)
+{
+
+}
+
 void Bootloader_task::work()
 {
 	{
@@ -295,9 +401,6 @@ void Bootloader_task::work()
 
 	logger->log(LOG_LEVEL::info, "Bootloader_task", "Starting usb");
 	init_usb();
-
-	m_fastboot.set_download_buffer(reinterpret_cast<uint8_t*>(0x24000000), 512*1024*1024);
-	m_fastboot.set_fs(&m_fs);
 
 	for(;;)
 	{

@@ -219,121 +219,62 @@ extern "C"
 
 	void tud_suspend_cb(bool remote_wakeup_en)
 	{
-
+		usb_core_task.handle_tud_suspend_cb(remote_wakeup_en);
 	}
 
 	void tud_resume_cb(void)
 	{
-		
+		usb_core_task.handle_tud_resume_cb();
 	}
 
 	void tud_mount_cb(void)
 	{
-
+		usb_core_task.handle_tud_mount_cb();
 	}
 	void tud_umount_cb(void)
 	{
+		usb_core_task.handle_tud_umount_cb();
+	}
 
+	void USB_core_task::handle_tud_suspend_cb(bool remote_wakeup_en)
+	{
+		m_events.set_bits(USB_SUSPEND_BIT);
+	}
+	void USB_core_task::handle_tud_resume_cb(void)
+	{
+		m_events.clear_bits(USB_SUSPEND_BIT);
+	}
+	void USB_core_task::handle_tud_mount_cb(void)
+	{
+		m_events.set_bits(USB_MOUNTED_BIT);
+	}
+	void USB_core_task::handle_tud_umount_cb(void)
+	{
+		m_events.clear_bits(USB_MOUNTED_BIT);
 	}
 
 	uint32_t tud_dfu_get_timeout_cb(uint8_t alt, uint8_t state)
 	{
-		uint32_t bwPollTimeout_ms = 0;
-
-		switch(state)
-		{
-			case DFU_DNBUSY:
-			{
-				bwPollTimeout_ms = 100;
-				break;
-			}
-			case DFU_MANIFEST:
-			{
-				bwPollTimeout_ms = 1000;
-				break;
-			}
-			default:
-			{
-				bwPollTimeout_ms = 0;
-				break;
-			}
-		}
-
-		return bwPollTimeout_ms;
+		return bootloader_task.handle_tud_dfu_get_timeout_cb(alt, state);
 	}
 	void tud_dfu_download_cb(uint8_t alt, uint16_t block_num, uint8_t const *data, uint16_t length)
 	{
-		if(block_num == 0)
-		{
-			if(m_fd >= 0)
-			{
-				if(SPIFFS_close(m_fs->get_fs(), m_fd) < 0)
-				{
-					tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
-					return;
-				}
-
-				m_fd = 0;
-			}
-
-			m_fd = SPIFFS_open(m_fs->get_fs(), flash_name.c_str(), SPIFFS_CREAT | SPIFFS_TRUNC | SPIFFS_RDWR, 0);
-			if(fd < 0)
-			{
-				tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
-				return;
-			}
-		}
-
-		if(m_fd <= 0)
-		{
-			tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
-			return;
-		}
-
-		// copy in
-		const size_t offset = size_t(block_num) * m_download_block_size;
-		memcpy(m_download_base + offset, data, length);
-
-		// Commit to flash
-		if(SPIFFS_write(m_fs->get_fs(), m_fd, data, length) < 0)
-		{
-			tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
-		}
-		else
-		{
-			tud_dfu_finish_flashing(DFU_STATUS_OK);
-		}
+		bootloader_task.handle_tud_dfu_download_cb(alt, block_num, data, length);
 	}
 	void tud_dfu_manifest_cb(uint8_t alt)
 	{
-		if(m_fd <= 0)
-		{
-			tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
-			return;
-		}
-
-		// Close file
-		if(SPIFFS_close(m_fs->get_fs(), m_fd) < 0)
-		{
-			tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
-		}
-		else
-		{
-			tud_dfu_finish_flashing(DFU_STATUS_OK);
-		}
-
-		m_fd = 0;
+		bootloader_task.handle_tud_dfu_manifest_cb(alt);
 	}
 	uint16_t tud_dfu_upload_cb(uint8_t alt, uint16_t block_num, uint8_t* data, uint16_t length)
 	{
-		return 0;
+		return bootloader_task.handle_tud_dfu_upload_cb(alt, block_num, data, length);
 	}
 	void tud_dfu_detach_cb(void)
 	{
-
+		bootloader_task.handle_tud_dfu_detach_cb();
 	}
 	void tud_dfu_abort_cb(uint8_t alt)
 	{
-
+		bootloader_task.handle_tud_dfu_abort_cb(alt);
 	}
 }
