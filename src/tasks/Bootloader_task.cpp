@@ -37,7 +37,7 @@ uint32_t Bootloader_task::handle_tud_dfu_get_timeout_cb(uint8_t alt, uint8_t sta
 	{
 		case DFU_DNBUSY:
 		{
-			bwPollTimeout_ms = 100;
+			bwPollTimeout_ms = 0;
 			break;
 		}
 		case DFU_MANIFEST:
