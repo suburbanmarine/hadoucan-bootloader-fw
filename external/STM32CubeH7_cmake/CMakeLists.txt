@@ -192,6 +192,12 @@ add_library(freertos_v10
 
 	${STM32CUBEH7_DIR}/Middlewares/Third_Party/FreeRTOS/Source/portable/MemMang/heap_4.c
 )
+target_include_directories(freertos_v10 PUBLIC
+	${STM32CUBEH7_DIR}/Middlewares/Third_Party/FreeRTOS/Source/include
+)
+target_link_libraries(freertos_v10 PUBLIC
+	freertos_v10_config
+)
 
 add_library(freertos_v10_heap1
 	${STM32CUBEH7_DIR}/Middlewares/Third_Party/FreeRTOS/Source/portable/MemMang/heap_1.c
