@@ -85,6 +85,13 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 
 	// copy in
 	const size_t offset = size_t(block_num) * m_download_block_size;
+
+	if((offset + length) > m_mem_size)
+	{
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
+		return;		
+	}
+
 	memcpy(m_mem_base + offset, data, length);
 
 	// Commit to flash
