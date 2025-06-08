@@ -51,16 +51,10 @@ extern "C"
 
 	#define CONFIG_TOTAL_LEN TUD_CONFIG_DESC_LEN + TUD_DFU_DESC_LEN(DFU_ALT_COUNT)
 
-	uint8_t const desc_fs_configuration[] =
+	uint8_t const desc_configuration[] =
 	{
 		TUD_CONFIG_DESCRIPTOR(1, ITF_COUNT, 0, CONFIG_TOTAL_LEN, 0x00, 100),
-		TUD_DFU_DESCRIPTOR(ITF_NUM_DFU_MODE, DFU_ALT_COUNT, 4, DFU_FUNC_ATTRS, 1000, 64),
-	};
-
-	uint8_t const desc_hs_configuration[] =
-	{
-		TUD_CONFIG_DESCRIPTOR(1, ITF_COUNT, 0, CONFIG_TOTAL_LEN, 0x00, 100),
-		TUD_DFU_DESCRIPTOR(ITF_NUM_DFU_MODE, DFU_ALT_COUNT, 4, DFU_FUNC_ATTRS, 1000, 512),
+		TUD_DFU_DESCRIPTOR(ITF_NUM_DFU_MODE, DFU_ALT_COUNT, 4, DFU_FUNC_ATTRS, 1000, CFG_TUD_DFU_XFER_BUFSIZE),
 	};
 
 	tusb_desc_device_t const desc_device = {
@@ -95,13 +89,9 @@ extern "C"
 		switch(tud_speed_get())
 		{
 			case TUSB_SPEED_HIGH:
-			{
-				ret = desc_hs_configuration;
-				break;
-			}
 			case TUSB_SPEED_FULL:
 			{
-				ret = desc_fs_configuration;
+				ret = desc_configuration;
 				break;
 			}
 			default:
@@ -172,49 +162,6 @@ extern "C"
 		desc_str_u16[0] = (uint16_t) ((TUSB_DESC_STRING << 8) | (2 * chr_count + 2));
 
 		return desc_str_u16;
-	}
-
-	tusb_desc_device_qualifier_t const desc_device_qualifier =
-	{
-	  .bLength            = sizeof(tusb_desc_device_qualifier_t),
-	  .bDescriptorType    = TUSB_DESC_DEVICE_QUALIFIER,
-	  .bcdUSB             = USB_BCD,
-
-	  .bDeviceClass       = 0x00,
-	  .bDeviceSubClass    = 0x00,
-	  .bDeviceProtocol    = 0x00,
-
-	  .bMaxPacketSize0    = CFG_TUD_ENDPOINT0_SIZE,
-	  .bNumConfigurations = 0x01,
-	  .bReserved          = 0x00
-	};
-	uint8_t const* tud_descriptor_device_qualifier_cb(void)
-	{
-		return (uint8_t const*) &desc_device_qualifier;
-	}
-
-	uint8_t desc_other_speed_config[CONFIG_TOTAL_LEN];
-	uint8_t const* tud_descriptor_other_speed_configuration_cb(uint8_t index)
-	{
-		switch(tud_speed_get())
-		{
-			case TUSB_SPEED_FULL:
-			{
-				memcpy(desc_other_speed_config, desc_hs_configuration, CONFIG_TOTAL_LEN);
-				break;
-			}
-			case TUSB_SPEED_HIGH:
-			{
-				memcpy(desc_other_speed_config, desc_fs_configuration, CONFIG_TOTAL_LEN);
-				break;
-			}
-			default:
-			{
-				break;
-			}
-		}
-
-		return desc_other_speed_config;
 	}
 
 	void tud_suspend_cb(bool remote_wakeup_en)

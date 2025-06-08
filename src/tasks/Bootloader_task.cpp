@@ -91,11 +91,10 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 	if(SPIFFS_write(m_fs.get_fs(), m_fd, (void*)data, length) < 0)
 	{
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
+		return;
 	}
-	else
-	{
-		tud_dfu_finish_flashing(DFU_STATUS_OK);
-	}
+
+	tud_dfu_finish_flashing(DFU_STATUS_OK);
 }
 void Bootloader_task::handle_tud_dfu_manifest_cb(uint8_t alt)
 {
@@ -128,11 +127,11 @@ uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_n
 }
 void Bootloader_task::handle_tud_dfu_detach_cb(void)
 {
-
+	// TODO load_verify_bin_app_image or reboot
 }
 void Bootloader_task::handle_tud_dfu_abort_cb(uint8_t alt)
 {
-
+	// TODO ???
 }
 
 void Bootloader_task::work()
