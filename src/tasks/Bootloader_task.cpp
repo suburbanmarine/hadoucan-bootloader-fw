@@ -83,7 +83,7 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 		}
 	}
 
-	if(m_fd <= 0)
+	if(m_fd < 0)
 	{
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
 		return;
@@ -125,15 +125,22 @@ void Bootloader_task::handle_tud_dfu_manifest_cb(uint8_t alt)
 	}
 
 	// Close file
-	if(SPIFFS_close(m_fs.get_fs(), m_fd) != SPIFFS_OK)
+	if(SPIFFS_close(m_fs.get_fs(), m_fd) < 0)
 	{
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
 		return;
 	}
 	m_fd = -1;
 
-	// Atomic rename file
-	if(SPIFFS_rename(m_fs.get_fs(), "app.bin.tmp", "app.bin") != SPIFFS_OK)
+	// Rename file
+
+	if(SPIFFS_remove(m_fs.get_fs(), "app.bin") < 0)
+	{
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
+		return;
+	}
+
+	if(SPIFFS_rename(m_fs.get_fs(), "app.bin.tmp", "app.bin") < 0)
 	{
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
 		return;
@@ -402,9 +409,6 @@ void Bootloader_task::work()
 			boot_key.update_crc();
 		}
 	}
-
-	boot_key.bootloader_op = uint8_t(Bootloader_key::Bootloader_ops::RUN_BOOTLDR);
-	boot_key.update_crc();
 
 	m_fs.initialize();
 	m_fs.set_flash(&m_qspi);
