@@ -200,6 +200,7 @@ void Bootloader_task::handle_tud_dfu_detach_cb(void)
 	boot_key.to_addr(reinterpret_cast<uint8_t volatile *>(0x38800000));
 
 	asm volatile(
+		"cpsid i\n"
 		"isb sy\n"
 		"dsb sy\n"
 		: /* no out */
@@ -219,6 +220,7 @@ void Bootloader_task::handle_tud_dfu_abort_cb(uint8_t alt)
 	boot_key.to_addr(reinterpret_cast<uint8_t volatile *>(0x38800000));
 
 	asm volatile(
+		"cpsid i\n"
 		"isb sy\n"
 		"dsb sy\n"
 		: /* no out */
