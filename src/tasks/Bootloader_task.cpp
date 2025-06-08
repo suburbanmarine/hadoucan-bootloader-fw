@@ -299,69 +299,9 @@ void Bootloader_task::work()
 	m_fastboot.set_download_buffer(reinterpret_cast<uint8_t*>(0x24000000), 512*1024*1024);
 	m_fastboot.set_fs(&m_fs);
 
-	std::function<bool(void)> has_line_pred   = std::bind(&USB_rx_buffer_task::has_line, &usb_rx_buffer_task);
-	std::function<bool(void)> has_buffer_pred = std::bind(&USB_rx_buffer_task::has_data, &usb_rx_buffer_task);
-	
-	std::vector<uint8_t> in_buffer;
-	in_buffer.reserve(1024);
-
-	std::vector<uint8_t> out_buffer;
-	out_buffer.reserve(1024);
-
 	for(;;)
 	{
-		{
-			std::unique_lock<Mutex_static> lock(usb_rx_buffer_task.get_mutex());
-		
-			if(m_fastboot.get_state() == Fastboot::Fastboot_state::LINE_MODE)
-			{
-				usb_rx_buffer_task.get_cv().wait(lock, std::cref(has_line_pred));
-			}
-			else if(m_fastboot.get_state() == Fastboot::Fastboot_state::PACKET_MODE)
-			{
-				usb_rx_buffer_task.get_cv().wait(lock, std::cref(has_buffer_pred));
-			}
-			else
-			{
-				for(;;)
-				{
-
-				}
-			}
-
-			if(m_fastboot.get_state() == Fastboot::Fastboot_state::LINE_MODE)
-			{
-				if(!usb_rx_buffer_task.get_line(&in_buffer))
-				{
-					continue;
-				}
-			}
-			else if(m_fastboot.get_state() == Fastboot::Fastboot_state::PACKET_MODE)
-			{
-				if(!usb_rx_buffer_task.get_data(&in_buffer, 1024))
-				{
-					continue;
-				}
-			}
-			else
-			{
-				for(;;)
-				{
-
-				}
-			}
-		}
-
-		//either a line or a data mode packet
-		m_fastboot.process(in_buffer, &out_buffer);
-
-		if(!out_buffer.empty())
-		{
-			tud_cdc_n_write(0, out_buffer.data(), out_buffer.size());
-			tud_cdc_n_write_flush(0);
-
-			out_buffer.clear();
-		}
+		vTaskDelay(pdMS_TO_TICKS(100));
 	}
 }
 
@@ -1013,17 +953,9 @@ bool Bootloader_task::init_usb()
 			.speed = TUSB_SPEED_AUTO
 		};
 		tusb_init(1, &dev_init);
-
-		tud_cdc_configure_fifo_t cdc_init = {
-			.rx_persistent = 0,
-			.tx_persistent = 0
-		};
-		tud_cdc_configure_fifo(&cdc_init);
 	}
 
-
 	//process usb packets
-	usb_rx_buffer_task.launch("usb_rx_buf", 3);
 	usb_core_task.launch("usb_core", 4);
 
 	return true;

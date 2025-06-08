@@ -16,21 +16,6 @@ void USB_core_task::work()
 	}
 }
 
-void USB_core_task::wait_for_usb_rx_avail()
-{
-	while( ! (RX_AVAIL_BIT & m_events.wait_bits(RX_AVAIL_BIT, true, true, portMAX_DELAY)) )
-	{
-
-	}
-}
-void USB_core_task::wait_for_usb_tx_complete()
-{
-	while( ! (TX_COMPL_BIT & m_events.wait_bits(TX_COMPL_BIT, true, true, portMAX_DELAY)) )
-	{
-
-	}
-}
-
 extern "C"
 {
 	void OTG_FS_IRQHandler(void)
@@ -47,8 +32,7 @@ extern "C"
 	#define USB_PID   0x6666
 	#define USB_BCD   0x0200
 
-	#define ITF_NUM_CDC      0
-	#define ITF_NUM_CDC_DATA 1
+	#define ITF_NUM_DFU_MODE 0
 
 	#define EPNUM_CDC_NOTIF   0x81
 	#define EPNUM_CDC_OUT     0x02
@@ -61,16 +45,19 @@ extern "C"
 		STRID_SERIAL
 	};
 
+	#define DFU_FUNC_ATTRS (DFU_ATTR_CAN_UPLOAD | DFU_ATTR_CAN_DOWNLOAD | DFU_ATTR_MANIFESTATION_TOLERANT)
+	#define DFU_ALT_COUNT 1
+
 	uint8_t const desc_fs_configuration[] =
 	{
-		TUD_CONFIG_DESCRIPTOR(1, 2, 0, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN, 0x00, 100),
-		TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, 4, EPNUM_CDC_NOTIF, 8, EPNUM_CDC_OUT, EPNUM_CDC_IN, 64),
+		TUD_CONFIG_DESCRIPTOR(1, 2, 0, TUD_CONFIG_DESC_LEN + TUD_DFU_DESC_LEN(DFU_ALT_COUNT), 0x00, 100),
+		TUD_DFU_DESCRIPTOR(ITF_NUM_DFU_MODE, DFU_ALT_COUNT, 4, DFU_FUNC_ATTRS, 1000, 64),
 	};
 
 	uint8_t const desc_hs_configuration[] =
 	{
 		TUD_CONFIG_DESCRIPTOR(1, 2, 0, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN, 0x00, 100),
-		TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, 4, EPNUM_CDC_NOTIF, 8, EPNUM_CDC_OUT, EPNUM_CDC_IN, 512),
+		TUD_DFU_DESCRIPTOR(ITF_NUM_DFU_MODE, DFU_ALT_COUNT, 4, DFU_FUNC_ATTRS, 1000, 512),
 	};
 
 	tusb_desc_device_t const desc_device = {
@@ -246,29 +233,49 @@ extern "C"
 
 	}
 
-	void tud_cdc_line_state_cb(uint8_t instance, bool dtr, bool rts)
+	uint32_t tud_dfu_get_timeout_cb(uint8_t alt, uint8_t state)
 	{
-		usb_core_task.m_dtr.store(dtr);
-		usb_core_task.m_rts.store(rts);
-	}
+		uint32_t bwPollTimeout_ms = 0;
 
-	void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* p_line_coding)
-	{
-		usb_core_task.m_bit_rate.store(p_line_coding->bit_rate);
-		usb_core_task.m_stop_bits.store(p_line_coding->stop_bits);
-		usb_core_task.m_parity.store(p_line_coding->parity);
-		usb_core_task.m_data_bits.store(p_line_coding->data_bits);
-	}
+		switch(state)
+		{
+			case DFU_DNBUSY:
+			{
+				bwPollTimeout_ms = 100;
+				break;
+			}
+			case DFU_MANIFEST:
+			{
+				bwPollTimeout_ms = 0;
+				break;
+			}
+			default:
+			{
+				bwPollTimeout_ms = 0;
+				break;
+			}
+		}
 
-	// RX complete data available
-	void tud_cdc_rx_cb(uint8_t itf)
-	{
-		usb_core_task.m_events.set_bits(USB_core_task::RX_AVAIL_BIT);
+		return bwPollTimeout_ms;
 	}
-
-	// TX complete space available
-	void tud_cdc_tx_complete_cb(uint8_t itf)
+	void tud_dfu_download_cb(uint8_t alt, uint16_t block_num, uint8_t const *data, uint16_t length)
 	{
-		usb_core_task.m_events.set_bits(USB_core_task::TX_COMPL_BIT);
+		tud_dfu_finish_flashing(DFU_STATUS_OK);
+	}
+	void tud_dfu_manifest_cb(uint8_t alt)
+	{
+
+	}
+	uint16_t tud_dfu_upload_cb(uint8_t alt, uint16_t block_num, uint8_t* data, uint16_t length)
+	{
+		return 0;
+	}
+	void tud_dfu_detach_cb(void)
+	{
+
+	}
+	void tud_dfu_abort_cb(uint8_t alt)
+	{
+
 	}
 }
