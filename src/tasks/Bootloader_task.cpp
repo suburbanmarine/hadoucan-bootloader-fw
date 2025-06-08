@@ -206,19 +206,7 @@ void Bootloader_task::handle_tud_dfu_detach_cb(void)
 	boot_key.update_crc();
 	boot_key.to_addr(reinterpret_cast<uint8_t volatile *>(0x38800000));
 
-	asm volatile(
-		"cpsid i\n"
-		"isb sy\n"
-		"dsb sy\n"
-		: /* no out */
-		: /* no in */
-		: "memory"
-		);
-
-	SCB_DisableDCache();
-	SCB_DisableICache();
-	
-	NVIC_SystemReset();
+	sync_and_reset();
 }
 void Bootloader_task::handle_tud_dfu_abort_cb(uint8_t alt)
 {
@@ -229,19 +217,7 @@ void Bootloader_task::handle_tud_dfu_abort_cb(uint8_t alt)
 	boot_key.update_crc();
 	boot_key.to_addr(reinterpret_cast<uint8_t volatile *>(0x38800000));
 
-	asm volatile(
-		"cpsid i\n"
-		"isb sy\n"
-		"dsb sy\n"
-		: /* no out */
-		: /* no in */
-		: "memory"
-		);
-
-	SCB_DisableDCache();
-	SCB_DisableICache();
-	
-	NVIC_SystemReset();
+	sync_and_reset();
 }
 
 void Bootloader_task::work()
@@ -316,26 +292,7 @@ void Bootloader_task::work()
 				logger->log(LOG_LEVEL::fatal, "Bootloader_task", "Error writing option bytes");
 			}
 			
-			{
-				asm volatile(
-					"cpsid i\n"
-					"isb sy\n"
-					"dsb sy\n"
-					: /* no out */
-					: /* no in */
-					: "memory"
-				);
-
-				SCB_DisableDCache();
-				SCB_DisableICache();
-
-				NVIC_SystemReset();
-			}
-		
-			for(;;)
-			{
-
-			}
+			sync_and_reset();
 		}
 		else
 		{
@@ -861,8 +818,8 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 	//Disable ISR, sync
 	asm volatile(
 		"cpsid i\n"
-		"dsb 0xF\n"
-		"isb 0xF\n"
+		"isb sy\n"
+		"dsb sy\n"
 		: /* no out */
 		: /* no in */
 		: "memory"
@@ -878,8 +835,8 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 
 	//Sync
 	asm volatile(
-		"dsb 0xF\n"
-		"isb 0xF\n"
+		"isb sy\n"
+		"dsb sy\n"
 		: /* no out */
 		: /* no in */
 		: "memory"
@@ -898,31 +855,31 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 
 	//disable and reset peripherals
 	__HAL_RCC_AHB1_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_AHB1_RELEASE_RESET();
 	__HAL_RCC_AHB2_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_AHB2_RELEASE_RESET();
 
 	//we can't bulk reset AHB3 because that resets the cpu and fmc
 	// __HAL_RCC_AHB3_FORCE_RESET();
 	// __HAL_RCC_AHB3_RELEASE_RESET();
 	__HAL_RCC_MDMA_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_MDMA_RELEASE_RESET();
 	__HAL_RCC_DMA2D_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_DMA2D_RELEASE_RESET();
 	__HAL_RCC_JPGDECRST_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_JPGDECRST_RELEASE_RESET();
 	// __HAL_RCC_FMC_FORCE_RESET();
 	// __HAL_RCC_FMC_RELEASE_RESET();
 	__HAL_RCC_QSPI_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_QSPI_RELEASE_RESET();
 	__HAL_RCC_SDMMC1_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_SDMMC1_RELEASE_RESET();
 	// __HAL_RCC_CPU_FORCE_RESET();
 	// __HAL_RCC_CPU_RELEASE_RESET();
@@ -932,25 +889,25 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 	__HAL_RCC_AHB4_RELEASE_RESET();
 
 	__HAL_RCC_APB1L_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_APB1L_RELEASE_RESET();
 	__HAL_RCC_APB1H_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_APB1H_RELEASE_RESET();
 	__HAL_RCC_APB2_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_APB2_RELEASE_RESET();
 	__HAL_RCC_APB3_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_APB3_RELEASE_RESET();
 	__HAL_RCC_APB4_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_APB4_RELEASE_RESET();
 
 	//Sync
 	asm volatile(
-		"dsb 0xF\n"
-		"isb 0xF\n"
+		"isb sy\n"
+		"dsb sy\n"
 		: /* no out */
 		: /* no in */
 		: "memory"
@@ -979,8 +936,8 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 
 	//Sync
 	asm volatile(
-		"dsb 0xF\n"
-		"isb 0xF\n"
+		"isb sy\n"
+		"dsb sy\n"
 		: /* no out */
 		: /* no in */
 		: "memory"
@@ -990,8 +947,8 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 	__set_MSP(estack);
 
 	asm volatile(
-		"dsb 0xF\n"
-		"isb 0xF\n"
+		"isb sy\n"
+		"dsb sy\n"
 		"bx %[jump]\n"
 	: /* no out */
 	: [jump] "r" (jump_addr)
@@ -1187,4 +1144,26 @@ void Bootloader_task::get_unique_id_str(std::array<char, 25>* const id_str)
 	get_unique_id(&id);
 
 	snprintf(id_str->data(), id_str->size(), "%08" PRIX32 "%08" PRIX32 "%08" PRIX32, id[0], id[1], id[2]);
+}
+
+void Bootloader_task::sync_and_reset()
+{
+	asm volatile(
+		"cpsid i\n"
+		"isb sy\n"
+		"dsb sy\n"
+		: /* no out */
+		: /* no in */
+		: "memory"
+		);
+
+	SCB_DisableDCache();
+	SCB_DisableICache();
+	
+	NVIC_SystemReset();
+
+	for(;;)
+	{
+
+	}	
 }
