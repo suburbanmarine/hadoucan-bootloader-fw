@@ -66,7 +66,7 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 	{
 		if(m_fd >= 0)
 		{
-			if(SPIFFS_close(m_fs.get_fs(), m_fd) != SPIFFS_OK)
+			if(SPIFFS_close(m_fs.get_fs(), m_fd) < 0)
 			{
 				tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
 				return;
@@ -159,7 +159,7 @@ uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_n
 	{
 		if(m_fd >= 0)
 		{
-			if(SPIFFS_close(m_fs.get_fs(), m_fd) != SPIFFS_OK)
+			if(SPIFFS_close(m_fs.get_fs(), m_fd) < 0)
 			{
 				return 0;
 			}
