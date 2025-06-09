@@ -374,14 +374,14 @@ void Bootloader_task::work()
 
 	logger->log(LOG_LEVEL::info, "Bootloader_task", "Mounting flash fs");
 	int mount_ret = m_fs.mount();
-	if(mount_ret != SPIFFS_OK)
+	if(mount_ret != LFS_ERR_OK)
 	{
 		logger->log(LOG_LEVEL::error, "Bootloader_task", "Flash mount failed: %d", mount_ret);
 		logger->log(LOG_LEVEL::error, "Bootloader_task", "You will need to reload the firmware");
 
 		logger->log(LOG_LEVEL::info, "Bootloader_task", "Format flash");
 		int format_ret = m_fs.format();
-		if(format_ret != SPIFFS_OK)
+		if(format_ret != LFS_ERR_OK)
 		{
 			logger->log(LOG_LEVEL::error, "Bootloader_task", "Flash format failed: %d", format_ret);
 			logger->log(LOG_LEVEL::error, "Bootloader_task", "Try a power cycle, your board may be broken");
@@ -393,7 +393,7 @@ void Bootloader_task::work()
 
 		logger->log(LOG_LEVEL::info, "Bootloader_task", "Mounting flash fs");
 		mount_ret = m_fs.mount();
-		if(mount_ret != SPIFFS_OK)
+		if(mount_ret != LFS_ERR_OK)
 		{
 			logger->log(LOG_LEVEL::error, "Bootloader_task", "Flash mount failed right after we formatted it: %d", mount_ret);
 			logger->log(LOG_LEVEL::error, "Bootloader_task", "Try a power cycle, your board may be broken");
@@ -475,10 +475,11 @@ bool Bootloader_task::load_verify_hex_app_image()
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 
 	const char* fname = "app.hex";
-	int fd = SPIFFS_open(m_fs.get_fs(), fname, SPIFFS_RDONLY, 0);
-	if(fd < 0)
+	lfs_file_t fd = { };
+	int ret = lfs_file_open(m_fs.get_fs(), &fd, fname, LFS_O_RDONLY);
+	if(ret < 0)
 	{
-		logger->log(LOG_LEVEL::error, "Bootloader_task", "Opening file %s failed: %" PRId32, fname, SPIFFS_errno(m_fs.get_fs()));
+		logger->log(LOG_LEVEL::error, "Bootloader_task", "Opening file %s failed: %" PRId32, fname, ret);
 		return false;
 	}
 
@@ -500,10 +501,10 @@ bool Bootloader_task::load_verify_hex_app_image()
 
 	Intel_hex_loader hex_loader;
 
-	int read_ret = 0;
+	lfs_ssize_t read_ret = 0;
 	do
 	{
-		read_ret = SPIFFS_read(m_fs.get_fs(), fd, read_buffer.data(), read_buffer.size());
+		read_ret = lfs_file_read(m_fs.get_fs(), &fd, read_buffer.data(), read_buffer.size());
 		if(read_ret < 0)
 		{
 			return false;
@@ -536,10 +537,10 @@ bool Bootloader_task::load_verify_hex_app_image()
 		} while(line_it != file_buffer.end());
 	} while(read_ret > 0);
 	
-	s32_t close_ret = SPIFFS_close(m_fs.get_fs(), fd);
-	if(close_ret != SPIFFS_OK)
+	int close_ret = lfs_file_close(m_fs.get_fs(), &fd);
+	if(close_ret != LFS_ERR_OK)
 	{
-		logger->log(LOG_LEVEL::error, "Bootloader_task", "close file %s failed: %" PRId32, fname, SPIFFS_errno(m_fs.get_fs()));
+		logger->log(LOG_LEVEL::error, "Bootloader_task", "close file %s failed: %" PRId32, fname, close_ret);
 	}
 
 	logger->log(LOG_LEVEL::info, "Bootloader_task", "File loaded");
@@ -590,11 +591,11 @@ bool Bootloader_task::load_verify_bin_app_image()
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 
 	const char* fname = "app.bin";
-
-	int fd = SPIFFS_open(m_fs.get_fs(), fname, SPIFFS_RDONLY, 0);
-	if(fd < 0)
+	lfs_file_t fd = { };
+	int ret = lfs_file_open(m_fs.get_fs(), &fd, fname, LFS_O_RDONLY);
+	if(ret < 0)
 	{
-		logger->log(LOG_LEVEL::error, "Bootloader_task", "Opening file %s failed: %" PRId32, fname, SPIFFS_errno(m_fs.get_fs()));
+		logger->log(LOG_LEVEL::error, "Bootloader_task", "Opening file %s failed: %" PRId32, fname, ret);
 		return false;
 	}
 
@@ -610,10 +611,10 @@ bool Bootloader_task::load_verify_bin_app_image()
 	volatile uint8_t* const axi_base = reinterpret_cast<volatile uint8_t*>(0x24000000);
 	size_t num_written = 0;
 
-	int read_ret = 0;
+	lfs_ssize_t read_ret = 0;
 	do
 	{
-		read_ret = SPIFFS_read(m_fs.get_fs(), fd, read_buffer.data(), read_buffer.size());
+		read_ret = lfs_file_read(m_fs.get_fs(), &fd, read_buffer.data(), read_buffer.size());
 		if(read_ret < 0)
 		{
 			return false;
@@ -626,10 +627,10 @@ bool Bootloader_task::load_verify_bin_app_image()
 
 	} while(read_ret > 0);
 	
-	s32_t close_ret = SPIFFS_close(m_fs.get_fs(), fd);
-	if(close_ret != SPIFFS_OK)
+	int close_ret = lfs_file_close(m_fs.get_fs(), &fd);
+	if(close_ret != LFS_ERR_OK)
 	{
-		logger->log(LOG_LEVEL::error, "Bootloader_task", "close file %s failed: %" PRId32, fname, SPIFFS_errno(m_fs.get_fs()));
+		logger->log(LOG_LEVEL::error, "Bootloader_task", "close file %s failed: %" PRId32, fname, close_ret);
 	}
 
 	logger->log(LOG_LEVEL::info, "Bootloader_task", "File loaded");
@@ -672,20 +673,21 @@ bool Bootloader_task::load_verify_bin_gcm_app_image()
 
 	const char* appfname = "app.bin.enc";
 	const char* appauxfname = "app.bin.enc.xml";
-
-	int fd = SPIFFS_open(m_fs.get_fs(), appfname, SPIFFS_RDONLY, 0);
-	if(fd < 0)
+	lfs_file_t fd = { };
+	int ret = lfs_file_open(m_fs.get_fs(), &fd, appfname, LFS_O_RDONLY);
+	if(ret < 0)
 	{
-		logger->log(LOG_LEVEL::error, "Bootloader_task", "Opening file %s failed: %" PRId32, appfname, SPIFFS_errno(m_fs.get_fs()));
+		logger->log(LOG_LEVEL::error, "Bootloader_task", "Opening file %s failed: %" PRId32, appfname, ret);
 		return false;
 	}
 
 	AES_GCM_aux_data aux_data;
 	{
-		int fd_aux = SPIFFS_open(m_fs.get_fs(), appauxfname, SPIFFS_RDONLY, 0);
-		if(fd < 0)
+		lfs_file_t fd_aux = { };
+		int ret_aux = lfs_file_open(m_fs.get_fs(), &fd_aux, appauxfname, LFS_O_RDONLY);
+		if(ret_aux < 0)
 		{
-			logger->log(LOG_LEVEL::error, "Bootloader_task", "Opening file %s failed: %" PRId32, appauxfname, SPIFFS_errno(m_fs.get_fs()));
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "Opening file %s failed: %" PRId32, appauxfname, ret_aux);
 			return false;
 		}
 
