@@ -19,7 +19,6 @@
 
 #ifndef CFG_TUSB_MEM_SECTION
 #define CFG_TUSB_MEM_SECTION __attribute__ (( section(".ram_dtcm_noload") ))
-// #define CFG_TUSB_MEM_SECTION
 #endif
 
 #ifndef CFG_TUSB_MEM_ALIGN
@@ -30,16 +29,8 @@
 #define CFG_TUD_ENDPOINT0_SIZE   64
 #endif
 
-#define CFG_TUD_CDC              1
-#define CFG_TUD_MSC              0
-#define CFG_TUD_HID              0
-#define CFG_TUD_MIDI             0
-#define CFG_TUD_VENDOR           0
-
-#define CFG_TUD_CDC_RX_BUFSIZE   2048
-#define CFG_TUD_CDC_TX_BUFSIZE   2048
-
-#define CFG_TUD_CDC_EP_BUFSIZE   (TUD_OPT_HIGH_SPEED ? 512 : 64)
+#define CFG_TUD_DFU              1
+#define CFG_TUD_DFU_XFER_BUFSIZE 512
 
 #ifdef __cplusplus
  }

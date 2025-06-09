@@ -29,6 +29,197 @@
 
 using freertos_util::logging::LOG_LEVEL;
 
+uint32_t Bootloader_task::handle_tud_dfu_get_timeout_cb(uint8_t alt, uint8_t state)
+{
+	uint32_t bwPollTimeout_ms = 0;
+
+	switch(state)
+	{
+		case DFU_DNBUSY:
+		{
+			bwPollTimeout_ms = 1;
+			break;
+		}
+		case DFU_MANIFEST:
+		{
+			bwPollTimeout_ms = 10;
+			break;
+		}
+		default:
+		{
+			bwPollTimeout_ms = 0;
+			break;
+		}
+	}
+
+	return bwPollTimeout_ms;
+}
+void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num, uint8_t const *data, uint16_t length)
+{
+	if(alt != 0)
+	{
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+		return;
+	}
+
+	if(block_num == 0)
+	{
+		if(m_fd >= 0)
+		{
+			if(SPIFFS_close(m_fs.get_fs(), m_fd) != SPIFFS_OK)
+			{
+				tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+				return;
+			}
+
+			m_fd = -1;
+		}
+
+		m_fd = SPIFFS_open(m_fs.get_fs(), "app.bin.tmp", SPIFFS_CREAT | SPIFFS_TRUNC | SPIFFS_RDWR, 0);
+		if(m_fd < 0)
+		{
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+			return;
+		}
+	}
+
+	if(m_fd < 0)
+	{
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+		return;
+	}
+
+	// copy in
+	const size_t offset = size_t(block_num) * m_download_block_size;
+
+	if((offset + length) > m_mem_size)
+	{
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
+		return;		
+	}
+
+	memcpy(m_mem_base + offset, data, length);
+
+	// Commit to flash
+	s32_t ret = SPIFFS_write(m_fs.get_fs(), m_fd, (void*)data, length);
+	if(ret != length)
+	{
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
+		return;
+	}
+
+	tud_dfu_finish_flashing(DFU_STATUS_OK);
+}
+void Bootloader_task::handle_tud_dfu_manifest_cb(uint8_t alt)
+{
+	if(alt != 0)
+	{
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+		return;
+	}
+
+	if(m_fd <= 0)
+	{
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+		return;
+	}
+
+	// Close file
+	if(SPIFFS_close(m_fs.get_fs(), m_fd) < 0)
+	{
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
+		return;
+	}
+	m_fd = -1;
+
+	// Rename file
+
+	if(SPIFFS_remove(m_fs.get_fs(), "app.bin") < 0)
+	{
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
+		return;
+	}
+
+	if(SPIFFS_rename(m_fs.get_fs(), "app.bin.tmp", "app.bin") < 0)
+	{
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
+		return;
+	}
+
+	tud_dfu_finish_flashing(DFU_STATUS_OK);
+}
+uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_num, uint8_t* data, uint16_t length)
+{
+	if(alt != 0)
+	{
+		return 0;
+	}
+
+	if(block_num == 0)
+	{
+		if(m_fd >= 0)
+		{
+			if(SPIFFS_close(m_fs.get_fs(), m_fd) != SPIFFS_OK)
+			{
+				return 0;
+			}
+
+			m_fd = -1;
+		}
+
+		m_fd = SPIFFS_open(m_fs.get_fs(), "app.bin", SPIFFS_RDONLY, 0);
+		if(m_fd < 0)
+		{
+			return 0;
+		}
+	}
+
+	if(m_fd < 0)
+	{
+		return 0;
+	}
+
+	// copy in
+	const size_t offset = size_t(block_num) * m_download_block_size;
+
+	// Read from flash
+	s32_t ret = SPIFFS_lseek(m_fs.get_fs(), m_fd, offset, SPIFFS_SEEK_SET);
+	if(ret != offset)
+	{
+		return 0;
+	}
+
+	ret = SPIFFS_read(m_fs.get_fs(), m_fd, data, length);
+	if(ret < 0)
+	{
+		return 0;
+	}
+
+	return ret;
+}
+void Bootloader_task::handle_tud_dfu_detach_cb(void)
+{
+	Bootloader_key boot_key;
+	boot_key.from_addr(reinterpret_cast<const uint8_t*>(0x38800000));
+
+	boot_key.bootloader_op = uint8_t(Bootloader_key::Bootloader_ops::RUN_APP);
+	boot_key.update_crc();
+	boot_key.to_addr(reinterpret_cast<uint8_t volatile *>(0x38800000));
+
+	sync_and_reset();
+}
+void Bootloader_task::handle_tud_dfu_abort_cb(uint8_t alt)
+{
+	Bootloader_key boot_key;
+	boot_key.from_addr(reinterpret_cast<const uint8_t*>(0x38800000));
+	
+	boot_key.bootloader_op = uint8_t(Bootloader_key::Bootloader_ops::RUN_APP);
+	boot_key.update_crc();
+	boot_key.to_addr(reinterpret_cast<uint8_t volatile *>(0x38800000));
+
+	sync_and_reset();
+}
+
 void Bootloader_task::work()
 {
 	{
@@ -101,26 +292,7 @@ void Bootloader_task::work()
 				logger->log(LOG_LEVEL::fatal, "Bootloader_task", "Error writing option bytes");
 			}
 			
-			{
-				asm volatile(
-					"cpsid i\n"
-					"dsb 0xF\n"
-					"isb 0xF\n"
-					: /* no out */
-					: /* no in */
-					: "memory"
-				);
-
-				SCB_DisableDCache();
-				SCB_DisableICache();
-
-				NVIC_SystemReset();
-			}
-		
-			for(;;)
-			{
-
-			}
+			sync_and_reset();
 		}
 		else
 		{
@@ -296,72 +468,9 @@ void Bootloader_task::work()
 	logger->log(LOG_LEVEL::info, "Bootloader_task", "Starting usb");
 	init_usb();
 
-	m_fastboot.set_download_buffer(reinterpret_cast<uint8_t*>(0x24000000), 512*1024*1024);
-	m_fastboot.set_fs(&m_fs);
-
-	std::function<bool(void)> has_line_pred   = std::bind(&USB_rx_buffer_task::has_line, &usb_rx_buffer_task);
-	std::function<bool(void)> has_buffer_pred = std::bind(&USB_rx_buffer_task::has_data, &usb_rx_buffer_task);
-	
-	std::vector<uint8_t> in_buffer;
-	in_buffer.reserve(1024);
-
-	std::vector<uint8_t> out_buffer;
-	out_buffer.reserve(1024);
-
 	for(;;)
 	{
-		{
-			std::unique_lock<Mutex_static> lock(usb_rx_buffer_task.get_mutex());
-		
-			if(m_fastboot.get_state() == Fastboot::Fastboot_state::LINE_MODE)
-			{
-				usb_rx_buffer_task.get_cv().wait(lock, std::cref(has_line_pred));
-			}
-			else if(m_fastboot.get_state() == Fastboot::Fastboot_state::PACKET_MODE)
-			{
-				usb_rx_buffer_task.get_cv().wait(lock, std::cref(has_buffer_pred));
-			}
-			else
-			{
-				for(;;)
-				{
-
-				}
-			}
-
-			if(m_fastboot.get_state() == Fastboot::Fastboot_state::LINE_MODE)
-			{
-				if(!usb_rx_buffer_task.get_line(&in_buffer))
-				{
-					continue;
-				}
-			}
-			else if(m_fastboot.get_state() == Fastboot::Fastboot_state::PACKET_MODE)
-			{
-				if(!usb_rx_buffer_task.get_data(&in_buffer, 1024))
-				{
-					continue;
-				}
-			}
-			else
-			{
-				for(;;)
-				{
-
-				}
-			}
-		}
-
-		//either a line or a data mode packet
-		m_fastboot.process(in_buffer, &out_buffer);
-
-		if(!out_buffer.empty())
-		{
-			tud_cdc_n_write(0, out_buffer.data(), out_buffer.size());
-			tud_cdc_n_write_flush(0);
-
-			out_buffer.clear();
-		}
+		vTaskDelay(pdMS_TO_TICKS(100));
 	}
 }
 
@@ -709,8 +818,8 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 	//Disable ISR, sync
 	asm volatile(
 		"cpsid i\n"
-		"dsb 0xF\n"
-		"isb 0xF\n"
+		"isb sy\n"
+		"dsb sy\n"
 		: /* no out */
 		: /* no in */
 		: "memory"
@@ -726,8 +835,8 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 
 	//Sync
 	asm volatile(
-		"dsb 0xF\n"
-		"isb 0xF\n"
+		"isb sy\n"
+		"dsb sy\n"
 		: /* no out */
 		: /* no in */
 		: "memory"
@@ -746,31 +855,31 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 
 	//disable and reset peripherals
 	__HAL_RCC_AHB1_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_AHB1_RELEASE_RESET();
 	__HAL_RCC_AHB2_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_AHB2_RELEASE_RESET();
 
 	//we can't bulk reset AHB3 because that resets the cpu and fmc
 	// __HAL_RCC_AHB3_FORCE_RESET();
 	// __HAL_RCC_AHB3_RELEASE_RESET();
 	__HAL_RCC_MDMA_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_MDMA_RELEASE_RESET();
 	__HAL_RCC_DMA2D_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_DMA2D_RELEASE_RESET();
 	__HAL_RCC_JPGDECRST_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_JPGDECRST_RELEASE_RESET();
 	// __HAL_RCC_FMC_FORCE_RESET();
 	// __HAL_RCC_FMC_RELEASE_RESET();
 	__HAL_RCC_QSPI_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_QSPI_RELEASE_RESET();
 	__HAL_RCC_SDMMC1_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_SDMMC1_RELEASE_RESET();
 	// __HAL_RCC_CPU_FORCE_RESET();
 	// __HAL_RCC_CPU_RELEASE_RESET();
@@ -780,25 +889,25 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 	__HAL_RCC_AHB4_RELEASE_RESET();
 
 	__HAL_RCC_APB1L_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_APB1L_RELEASE_RESET();
 	__HAL_RCC_APB1H_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_APB1H_RELEASE_RESET();
 	__HAL_RCC_APB2_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_APB2_RELEASE_RESET();
 	__HAL_RCC_APB3_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_APB3_RELEASE_RESET();
 	__HAL_RCC_APB4_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
+	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_APB4_RELEASE_RESET();
 
 	//Sync
 	asm volatile(
-		"dsb 0xF\n"
-		"isb 0xF\n"
+		"isb sy\n"
+		"dsb sy\n"
 		: /* no out */
 		: /* no in */
 		: "memory"
@@ -827,8 +936,8 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 
 	//Sync
 	asm volatile(
-		"dsb 0xF\n"
-		"isb 0xF\n"
+		"isb sy\n"
+		"dsb sy\n"
 		: /* no out */
 		: /* no in */
 		: "memory"
@@ -838,8 +947,8 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 	__set_MSP(estack);
 
 	asm volatile(
-		"dsb 0xF\n"
-		"isb 0xF\n"
+		"isb sy\n"
+		"dsb sy\n"
 		"bx %[jump]\n"
 	: /* no out */
 	: [jump] "r" (jump_addr)
@@ -1013,17 +1122,9 @@ bool Bootloader_task::init_usb()
 			.speed = TUSB_SPEED_AUTO
 		};
 		tusb_init(1, &dev_init);
-
-		tud_cdc_configure_fifo_t cdc_init = {
-			.rx_persistent = 0,
-			.tx_persistent = 0
-		};
-		tud_cdc_configure_fifo(&cdc_init);
 	}
 
-
 	//process usb packets
-	usb_rx_buffer_task.launch("usb_rx_buf", 3);
 	usb_core_task.launch("usb_core", 4);
 
 	return true;
@@ -1043,4 +1144,26 @@ void Bootloader_task::get_unique_id_str(std::array<char, 25>* const id_str)
 	get_unique_id(&id);
 
 	snprintf(id_str->data(), id_str->size(), "%08" PRIX32 "%08" PRIX32 "%08" PRIX32, id[0], id[1], id[2]);
+}
+
+void Bootloader_task::sync_and_reset()
+{
+	asm volatile(
+		"cpsid i\n"
+		"isb sy\n"
+		"dsb sy\n"
+		: /* no out */
+		: /* no in */
+		: "memory"
+		);
+
+	SCB_DisableDCache();
+	SCB_DisableICache();
+	
+	NVIC_SystemReset();
+
+	for(;;)
+	{
+
+	}	
 }

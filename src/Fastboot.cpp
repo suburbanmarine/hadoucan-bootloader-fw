@@ -366,8 +366,8 @@ void Fastboot::handle_reboot(const std::vector<uint8_t>& in_packet, std::vector<
 	//Disable ISR, sync
 	asm volatile(
 		"cpsid i\n"
-		"dsb 0xF\n"
-		"isb 0xF\n"
+		"isb sy\n"
+		"dsb sy\n"
 		: /* no out */
 		: /* no in */
 		: "memory"
@@ -399,8 +399,8 @@ void Fastboot::handle_reboot_bootloader(const std::vector<uint8_t>& in_packet, s
 	//Disable ISR, sync
 	asm volatile(
 		"cpsid i\n"
-		"dsb 0xF\n"
-		"isb 0xF\n"
+		"isb sy\n"
+		"dsb sy\n"
 		: /* no out */
 		: /* no in */
 		: "memory"

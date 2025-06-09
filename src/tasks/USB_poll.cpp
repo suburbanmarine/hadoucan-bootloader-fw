@@ -16,21 +16,6 @@ void USB_core_task::work()
 	}
 }
 
-void USB_core_task::wait_for_usb_rx_avail()
-{
-	while( ! (RX_AVAIL_BIT & m_events.wait_bits(RX_AVAIL_BIT, true, true, portMAX_DELAY)) )
-	{
-
-	}
-}
-void USB_core_task::wait_for_usb_tx_complete()
-{
-	while( ! (TX_COMPL_BIT & m_events.wait_bits(TX_COMPL_BIT, true, true, portMAX_DELAY)) )
-	{
-
-	}
-}
-
 extern "C"
 {
 	void OTG_FS_IRQHandler(void)
@@ -47,9 +32,6 @@ extern "C"
 	#define USB_PID   0x6666
 	#define USB_BCD   0x0200
 
-	#define ITF_NUM_CDC      0
-	#define ITF_NUM_CDC_DATA 1
-
 	#define EPNUM_CDC_NOTIF   0x81
 	#define EPNUM_CDC_OUT     0x02
 	#define EPNUM_CDC_IN      0x82
@@ -61,16 +43,18 @@ extern "C"
 		STRID_SERIAL
 	};
 
-	uint8_t const desc_fs_configuration[] =
-	{
-		TUD_CONFIG_DESCRIPTOR(1, 2, 0, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN, 0x00, 100),
-		TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, 4, EPNUM_CDC_NOTIF, 8, EPNUM_CDC_OUT, EPNUM_CDC_IN, 64),
-	};
+	#define DFU_FUNC_ATTRS (DFU_ATTR_CAN_UPLOAD | DFU_ATTR_CAN_DOWNLOAD | DFU_ATTR_MANIFESTATION_TOLERANT)
+	#define DFU_ALT_COUNT 1
 
-	uint8_t const desc_hs_configuration[] =
+	#define ITF_NUM_DFU_MODE 0
+	#define ITF_COUNT        1
+
+	#define CONFIG_TOTAL_LEN TUD_CONFIG_DESC_LEN + TUD_DFU_DESC_LEN(DFU_ALT_COUNT)
+
+	uint8_t const desc_configuration[] =
 	{
-		TUD_CONFIG_DESCRIPTOR(1, 2, 0, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN, 0x00, 100),
-		TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, 4, EPNUM_CDC_NOTIF, 8, EPNUM_CDC_OUT, EPNUM_CDC_IN, 512),
+		TUD_CONFIG_DESCRIPTOR(1, ITF_COUNT, 0, CONFIG_TOTAL_LEN, 0x00, 100),
+		TUD_DFU_DESCRIPTOR(ITF_NUM_DFU_MODE, DFU_ALT_COUNT, 4, DFU_FUNC_ATTRS, 5000, CFG_TUD_DFU_XFER_BUFSIZE),
 	};
 
 	tusb_desc_device_t const desc_device = {
@@ -78,9 +62,9 @@ extern "C"
 		.bDescriptorType    = TUSB_DESC_DEVICE,
 		.bcdUSB             = USB_BCD,
 
-		.bDeviceClass       = TUSB_CLASS_MISC,
-		.bDeviceSubClass    = MISC_SUBCLASS_COMMON,
-		.bDeviceProtocol    = MISC_PROTOCOL_IAD,
+		.bDeviceClass       = 0x00,
+		.bDeviceSubClass    = 0x00,
+		.bDeviceProtocol    = 0x00,
 
 		.bMaxPacketSize0    = CFG_TUD_ENDPOINT0_SIZE,
 
@@ -105,13 +89,9 @@ extern "C"
 		switch(tud_speed_get())
 		{
 			case TUSB_SPEED_HIGH:
-			{
-				ret = desc_hs_configuration;
-				break;
-			}
 			case TUSB_SPEED_FULL:
 			{
-				ret = desc_fs_configuration;
+				ret = desc_configuration;
 				break;
 			}
 			default:
@@ -130,7 +110,7 @@ extern "C"
 		"Suburban Marine, Inc.",       // 1: Manufacturer
 		"HadouCAN Bootloader",         // 2: Product
 		NULL,                          // 3: SN
-		"HadouCAN CDC"                 // 4: CDC Interface
+		"FLASH"                        // 4: DFU ALT 0
 	};
 
 	void ascii_to_u16le(const size_t len, char const * const in, uint16_t* const out)
@@ -184,91 +164,64 @@ extern "C"
 		return desc_str_u16;
 	}
 
-	tusb_desc_device_qualifier_t const desc_device_qualifier =
-	{
-	  .bLength            = sizeof(tusb_desc_device_qualifier_t),
-	  .bDescriptorType    = TUSB_DESC_DEVICE_QUALIFIER,
-	  .bcdUSB             = USB_BCD,
-
-	  .bDeviceClass       = TUSB_CLASS_MISC,
-	  .bDeviceSubClass    = MISC_SUBCLASS_COMMON,
-	  .bDeviceProtocol    = MISC_PROTOCOL_IAD,
-
-	  .bMaxPacketSize0    = CFG_TUD_ENDPOINT0_SIZE,
-	  .bNumConfigurations = 0x01,
-	  .bReserved          = 0x00
-	};
-	uint8_t const* tud_descriptor_device_qualifier_cb(void)
-	{
-		return (uint8_t const*) &desc_device_qualifier;
-	}
-
-	uint8_t desc_other_speed_config[TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN];
-	uint8_t const* tud_descriptor_other_speed_configuration_cb(uint8_t index)
-	{
-		switch(tud_speed_get())
-		{
-			case TUSB_SPEED_FULL:
-			{
-				memcpy(desc_other_speed_config, desc_hs_configuration, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN);
-				break;
-			}
-			case TUSB_SPEED_HIGH:
-			{
-				memcpy(desc_other_speed_config, desc_fs_configuration, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN);
-				break;
-			}
-			default:
-			{
-				break;
-			}
-		}
-
-		return desc_other_speed_config;
-	}
-
 	void tud_suspend_cb(bool remote_wakeup_en)
 	{
-
+		usb_core_task.handle_tud_suspend_cb(remote_wakeup_en);
 	}
 
 	void tud_resume_cb(void)
 	{
-		
+		usb_core_task.handle_tud_resume_cb();
 	}
 
 	void tud_mount_cb(void)
 	{
-
+		usb_core_task.handle_tud_mount_cb();
 	}
 	void tud_umount_cb(void)
 	{
-
+		usb_core_task.handle_tud_umount_cb();
 	}
 
-	void tud_cdc_line_state_cb(uint8_t instance, bool dtr, bool rts)
+	void USB_core_task::handle_tud_suspend_cb(bool remote_wakeup_en)
 	{
-		usb_core_task.m_dtr.store(dtr);
-		usb_core_task.m_rts.store(rts);
+		m_events.set_bits(USB_SUSPEND_BIT);
+	}
+	void USB_core_task::handle_tud_resume_cb(void)
+	{
+		m_events.clear_bits(USB_SUSPEND_BIT);
+	}
+	void USB_core_task::handle_tud_mount_cb(void)
+	{
+		m_events.set_bits(USB_MOUNTED_BIT);
+	}
+	void USB_core_task::handle_tud_umount_cb(void)
+	{
+		m_events.clear_bits(USB_MOUNTED_BIT);
 	}
 
-	void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* p_line_coding)
+	uint32_t tud_dfu_get_timeout_cb(uint8_t alt, uint8_t state)
 	{
-		usb_core_task.m_bit_rate.store(p_line_coding->bit_rate);
-		usb_core_task.m_stop_bits.store(p_line_coding->stop_bits);
-		usb_core_task.m_parity.store(p_line_coding->parity);
-		usb_core_task.m_data_bits.store(p_line_coding->data_bits);
+		return bootloader_task.handle_tud_dfu_get_timeout_cb(alt, state);
 	}
-
-	// RX complete data available
-	void tud_cdc_rx_cb(uint8_t itf)
+	void tud_dfu_download_cb(uint8_t alt, uint16_t block_num, uint8_t const *data, uint16_t length)
 	{
-		usb_core_task.m_events.set_bits(USB_core_task::RX_AVAIL_BIT);
+		bootloader_task.handle_tud_dfu_download_cb(alt, block_num, data, length);
 	}
-
-	// TX complete space available
-	void tud_cdc_tx_complete_cb(uint8_t itf)
+	void tud_dfu_manifest_cb(uint8_t alt)
 	{
-		usb_core_task.m_events.set_bits(USB_core_task::TX_COMPL_BIT);
+		bootloader_task.handle_tud_dfu_manifest_cb(alt);
+	}
+	uint16_t tud_dfu_upload_cb(uint8_t alt, uint16_t block_num, uint8_t* data, uint16_t length)
+	{
+		return bootloader_task.handle_tud_dfu_upload_cb(alt, block_num, data, length);
+	}
+	void tud_dfu_detach_cb(void)
+	{
+		bootloader_task.handle_tud_dfu_detach_cb();
+	}
+	void tud_dfu_abort_cb(uint8_t alt)
+	{
+		bootloader_task.handle_tud_dfu_abort_cb(alt);
 	}
 }

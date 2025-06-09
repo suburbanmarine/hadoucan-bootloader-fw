@@ -44,7 +44,7 @@ target_include_directories(freertos_v10_config
 add_library(tinyusb_config INTERFACE)
 target_include_directories(tinyusb_config
 	INTERFACE
-		hadoucan-fw/include
+		include
 )
 target_compile_definitions(tinyusb_config
 	INTERFACE
@@ -113,7 +113,6 @@ add_executable(stm32h7_qspi_boot.elf
 	src/hal_inst.c
 	src/sw_ver.cpp
 	
-	src/tasks/USB_rx_buffer_task.cpp
 	src/tasks/Bootloader_task.cpp
 	src/tasks/LED_task.cpp
 	src/tasks/Logging_task.cpp
@@ -126,7 +125,7 @@ add_executable(stm32h7_qspi_boot.elf
 	src/freertos_new.cpp
 	src/newlib_stubs.c
 
-	src/Fastboot.cpp
+#	src/Fastboot.cpp
 )
 
 target_compile_definitions(stm32h7_qspi_boot.elf
