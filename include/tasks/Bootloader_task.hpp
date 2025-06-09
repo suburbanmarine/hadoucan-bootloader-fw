@@ -68,6 +68,7 @@ protected:
 	bool load_verify_bin_app_image();
 	bool load_verify_bin_gcm_app_image();
 
+	void sync_and_reset();
 	W25Q16JV m_qspi;
 	W25Q16JV_app_region m_fs;
 
