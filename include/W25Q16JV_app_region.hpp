@@ -1,6 +1,6 @@
-#include "spiffs_int_w25q16jv.hpp"
+#include "lfs_int_w25q16jv.hpp"
 
-class W25Q16JV_app_region : public spiffs_int_w25q16jv
+class W25Q16JV_app_region : public lfs_int_w25q16jv
 {
 public:
 

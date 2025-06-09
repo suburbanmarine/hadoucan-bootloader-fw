@@ -64,26 +64,28 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 
 	if(block_num == 0)
 	{
-		if(m_fd >= 0)
+		if( m_fd.has_value() )
 		{
-			if(SPIFFS_close(m_fs.get_fs(), m_fd) < 0)
+			if(lfs_file_close(m_fs.get_fs(), &(m_fd.value())) < 0)
 			{
 				tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
 				return;
 			}
 
-			m_fd = -1;
+			m_fd.reset();
 		}
 
-		m_fd = SPIFFS_open(m_fs.get_fs(), "app.bin.tmp", SPIFFS_CREAT | SPIFFS_TRUNC | SPIFFS_RDWR, 0);
-		if(m_fd < 0)
+		lfs_file_t fd = { };
+		if(lfs_file_open(m_fs.get_fs(), &fd, "app.bin.tmp", LFS_O_CREAT | LFS_O_TRUNC | LFS_O_RDWR) < 0)
 		{
 			tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
 			return;
 		}
+
+		m_fd = fd;
 	}
 
-	if(m_fd < 0)
+	if( ! m_fd.has_value() )
 	{
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
 		return;
@@ -101,8 +103,8 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 	memcpy(m_mem_base + offset, data, length);
 
 	// Commit to flash
-	s32_t ret = SPIFFS_write(m_fs.get_fs(), m_fd, (void*)data, length);
-	if(ret != length)
+	lfs_ssize_t ret = lfs_file_write(m_fs.get_fs(), &(m_fd.value()), data, length);
+	if((ret < 0) || (ret != length))
 	{
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
 		return;
@@ -118,29 +120,22 @@ void Bootloader_task::handle_tud_dfu_manifest_cb(uint8_t alt)
 		return;
 	}
 
-	if(m_fd <= 0)
+	if( ! m_fd.has_value() )
 	{
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
 		return;
 	}
 
 	// Close file
-	if(SPIFFS_close(m_fs.get_fs(), m_fd) < 0)
+	if(lfs_file_close(m_fs.get_fs(), &m_fd.value()) < 0)
 	{
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
 		return;
 	}
-	m_fd = -1;
+	m_fd.reset();
 
 	// Rename file
-
-	if(SPIFFS_remove(m_fs.get_fs(), "app.bin") < 0)
-	{
-		tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
-		return;
-	}
-
-	if(SPIFFS_rename(m_fs.get_fs(), "app.bin.tmp", "app.bin") < 0)
+	if(lfs_rename(m_fs.get_fs(), "app.bin.tmp", "app.bin") < 0)
 	{
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
 		return;
@@ -157,45 +152,46 @@ uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_n
 
 	if(block_num == 0)
 	{
-		if(m_fd >= 0)
+		if( m_fd.has_value() )
 		{
-			if(SPIFFS_close(m_fs.get_fs(), m_fd) < 0)
+			if(lfs_file_close(m_fs.get_fs(), &m_fd.value()) < 0)
 			{
 				return 0;
 			}
 
-			m_fd = -1;
+			m_fd.reset();
 		}
 
-		m_fd = SPIFFS_open(m_fs.get_fs(), "app.bin", SPIFFS_RDONLY, 0);
-		if(m_fd < 0)
+		lfs_file_t fd = { };
+		if(lfs_file_open(m_fs.get_fs(), &fd, "app.bin", LFS_O_RDONLY) < 0)
 		{
 			return 0;
 		}
+		m_fd = fd;
 	}
 
-	if(m_fd < 0)
+	if( ! m_fd.has_value() )
 	{
 		return 0;
 	}
 
 	// copy in
-	const size_t offset = size_t(block_num) * m_download_block_size;
+	const lfs_soff_t offset = lfs_soff_t(block_num) * lfs_soff_t(m_download_block_size);
 
 	// Read from flash
-	s32_t ret = SPIFFS_lseek(m_fs.get_fs(), m_fd, offset, SPIFFS_SEEK_SET);
+	lfs_soff_t ret = lfs_file_seek(m_fs.get_fs(), &m_fd.value(), offset, LFS_SEEK_SET);
 	if(ret != offset)
 	{
 		return 0;
 	}
 
-	ret = SPIFFS_read(m_fs.get_fs(), m_fd, data, length);
-	if(ret < 0)
+	lfs_ssize_t read_ret = lfs_file_read(m_fs.get_fs(), &m_fd.value(), data, length);
+	if(read_ret < 0)
 	{
 		return 0;
 	}
 
-	return ret;
+	return read_ret;
 }
 void Bootloader_task::handle_tud_dfu_detach_cb(void)
 {
