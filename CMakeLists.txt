@@ -181,16 +181,18 @@ target_link_libraries(stm32h7_qspi_boot.elf
 	tinyusb_dcd
 
 	spi_flash
+	spiffs
 	spiffs_flash
 	spiffs_util
+	lfs
+	lfs_flash
+	lfs_util
 
 	mbedtls_util
 	tinyxml2_util
 
 	crc
 
-	spiffs
-	lfs
 
 	mbedtls
 	mbedcrypto
