@@ -3,7 +3,7 @@
 
 #include <new>
 
-void* operator new(std::size_t size) throw(std::bad_alloc)
+void* operator new(std::size_t size)
 {
 	void* const ptr = pvPortMalloc(size);
 
@@ -15,8 +15,8 @@ void* operator new(std::size_t size) throw(std::bad_alloc)
 			//Disable ISR, sync
 			asm volatile(
 				"cpsid i\n"
-				"dsb 0xF\n"
-				"isb 0xF\n"
+				"isb sy\n"
+				"dsb sy\n"
 				: /* no out */
 				: /* no in */
 				: "memory"
