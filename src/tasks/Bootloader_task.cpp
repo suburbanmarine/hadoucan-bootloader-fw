@@ -691,24 +691,30 @@ bool Bootloader_task::load_verify_bin_gcm_app_image()
 			return false;
 		}
 
-		spiffs_stat app_aux_stat;
-		int ret = SPIFFS_fstat(m_fs.get_fs(), fd_aux, &app_aux_stat);
-		if(ret != SPIFFS_OK)
+		lfs_info app_aux_stat = { };
+		int ret = lfs_stat(m_fs.get_fs(), appauxfname, &app_aux_stat);
+		if(ret != LFS_ERR_OK)
 		{
-			logger->log(LOG_LEVEL::error, "Bootloader_task", "fstat file %s failed: %" PRId32, appauxfname, SPIFFS_errno(m_fs.get_fs()));
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "fstat file %s failed: %" PRId32, appauxfname, ret);
+			return false;
+		}
+
+		if(app_aux_stat.type != LFS_TYPE_REG)
+		{
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "file %s not regular file", appauxfname, ret);
 			return false;
 		}
 
 		std::vector<char> aux_data_file(app_aux_stat.size);
-		int read_ret = SPIFFS_read(m_fs.get_fs(), fd_aux, aux_data_file.data(), aux_data_file.size());
+		int read_ret = lfs_file_read(m_fs.get_fs(), &fd_aux, aux_data_file.data(), aux_data_file.size());
 		if(read_ret < 0)
 		{
-			logger->log(LOG_LEVEL::error, "Bootloader_task", "file %s read failed: %" PRId32, appauxfname, SPIFFS_errno(m_fs.get_fs()));
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "file %s read failed: %" PRId32, appauxfname, read_ret);
 			return false;
 		}
 		else if(size_t(read_ret) != aux_data_file.size())
 		{
-			logger->log(LOG_LEVEL::error, "Bootloader_task", "file %s read failed: %" PRId32, appauxfname, SPIFFS_errno(m_fs.get_fs()));
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "file %s read failed: %" PRId32, appauxfname, read_ret);
 			return false;
 		}
 
@@ -725,10 +731,10 @@ bool Bootloader_task::load_verify_bin_gcm_app_image()
 			return false;	
 		}
 
-		s32_t close_ret = SPIFFS_close(m_fs.get_fs(), fd_aux);
-		if(close_ret != SPIFFS_OK)
+		int close_ret = lfs_file_close(m_fs.get_fs(), &fd_aux);
+		if(close_ret != LFS_ERR_OK)
 		{
-			logger->log(LOG_LEVEL::error, "Bootloader_task", "close file %s failed: %" PRId32, appauxfname, SPIFFS_errno(m_fs.get_fs()));
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "close file %s failed: %" PRId32, appauxfname, close_ret);
 		}
 	}
 	
@@ -750,7 +756,7 @@ bool Bootloader_task::load_verify_bin_gcm_app_image()
 		int read_ret = 0;
 		do
 		{
-			read_ret = SPIFFS_read(m_fs.get_fs(), fd, in_block.data(), in_block.size());
+			read_ret = lfs_file_read(m_fs.get_fs(), &fd, in_block.data(), in_block.size());
 			if(read_ret < 0)
 			{
 				return false;
@@ -781,10 +787,10 @@ bool Bootloader_task::load_verify_bin_gcm_app_image()
 	}
 	///
 
-	s32_t close_ret = SPIFFS_close(m_fs.get_fs(), fd);
-	if(close_ret != SPIFFS_OK)
+	int close_ret = lfs_file_close(m_fs.get_fs(), &fd);
+	if(close_ret != LFS_ERR_OK)
 	{
-		logger->log(LOG_LEVEL::error, "Bootloader_task", "close file %s failed: %" PRId32, appfname, SPIFFS_errno(m_fs.get_fs()));
+		logger->log(LOG_LEVEL::error, "Bootloader_task", "close file %s failed: %" PRId32, appfname, close_ret);
 	}
 
 	logger->log(LOG_LEVEL::info, "Bootloader_task", "File loaded");

@@ -184,6 +184,7 @@ target_link_libraries(stm32h7_qspi_boot.elf
 	spiffs
 	spiffs_flash
 	spiffs_util
+	
 	lfs
 	lfs_flash
 	lfs_util
