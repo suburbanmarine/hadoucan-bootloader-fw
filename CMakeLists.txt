@@ -18,13 +18,6 @@ add_definitions(
 	-DUSE_PWR_LDO_SUPPLY
 
 	-DWORD_SIZE=4
-
-	-DSPIFFS_USE_MAGIC
-	-DSPIFFS_USE_MAGIC_LENGTH
-	-DSPIFFS_LOCK=spiffs_lock_dispatch
-	-DSPIFFS_UNLOCK=spiffs_unlock_dispatch
-	-DSPIFFS_HAL_CALLBACK_EXTRA
-	-DSPIFFS_ALIGNED_OBJECT_INDEX_TABLES=1
 	
 	-DMBEDTLS_CONFIG_FILE=<config-no-entropy.h>
 )
@@ -99,19 +92,6 @@ add_subdirectory(external/emb_fs_util)
 add_subdirectory(external/freertos_cpp_util)
 add_subdirectory(external/mbedtls_util)
 add_subdirectory(external/tinyxml2_util)
-
-add_library(spiffs
-	external/spiffs/src/spiffs_cache.c
-	external/spiffs/src/spiffs_check.c
-	external/spiffs/src/spiffs_gc.c
-	external/spiffs/src/spiffs_hydrogen.c
-	external/spiffs/src/spiffs_nucleus.c
-)
-
-target_include_directories(spiffs
-	PUBLIC
-		external/spiffs/src
-)
 
 add_executable(stm32h7_qspi_boot.elf
 	src/system_stm32h7xx.c
