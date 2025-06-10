@@ -180,11 +180,7 @@ target_link_libraries(stm32h7_qspi_boot.elf
 	tinyusb_config
 	tinyusb_dcd
 
-	spi_flash
-	spiffs
-	spiffs_flash
-	spiffs_util
-	
+	spi_flash	
 	lfs
 	lfs_flash
 	lfs_util
