@@ -976,21 +976,25 @@ bool Bootloader_task::check_option_bytes()
 	HAL_FLASHEx_OBGetConfig(&ob_init);
 
 	bool ret = true;
-	// if(ob_init.WRPState != OB_WRPSTATE_ENABLE)
-	// {
-	// 	logger->log(LOG_LEVEL::fatal, "Bootloader_task", "WRPState incorrect");
-	// 	ret = false;
-	// }
-	// if(ob_init.WRPSector != OB_WRP_SECTOR_0)
-	// {
-	// 	logger->log(LOG_LEVEL::fatal, "Bootloader_task", "WRPSector incorrect");
-	// 	ret = false;
-	// }
-	if(ob_init.RDPLevel != OB_RDP_LEVEL_1)
+
+	if(ob_init.WRPState != OB_WRPSTATE_DISABLE)
+	{
+		logger->log(LOG_LEVEL::fatal, "Bootloader_task", "WRPState incorrect");
+		ret = false;
+	}
+
+	if(ob_init.WRPSector != OB_WRP_SECTOR_All)
+	{
+		logger->log(LOG_LEVEL::fatal, "Bootloader_task", "WRPSector incorrect");
+		ret = false;
+	}
+
+	if(ob_init.RDPLevel != OB_RDP_LEVEL_0)
 	{
 		logger->log(LOG_LEVEL::fatal, "Bootloader_task", "RDPLevel incorrect");
 		ret = false;
 	}
+
 	if(ob_init.BORLevel != OB_BOR_LEVEL3)
 	{
 		logger->log(LOG_LEVEL::fatal, "Bootloader_task", "BORLevel incorrect");
@@ -1002,57 +1006,51 @@ bool Bootloader_task::check_option_bytes()
 
 bool Bootloader_task::config_option_bytes()
 {
-	// HAL_FLASH_Unlock();
-
+	HAL_FLASH_Unlock();
 	HAL_FLASH_OB_Unlock();
 
-	FLASH_OBProgramInitTypeDef ob_init;
+	FLASH_OBProgramInitTypeDef ob_init = { };
 	ob_init.Banks = FLASH_BANK_1;
 	HAL_FLASHEx_OBGetConfig(&ob_init);
 
-#if 1
-	ob_init.OptionType = OPTIONBYTE_BOR | OPTIONBYTE_RDP;
-	ob_init.WRPState = OB_WRPSTATE_DISABLE;
-	ob_init.WRPSector = OB_WRP_SECTOR_All;
-	ob_init.RDPLevel = OB_RDP_LEVEL_1;
-	ob_init.BORLevel = OB_BOR_LEVEL3;
-	// ob_init.USERType
-	// ob_init.USERConfig
+	ob_init.OptionType = 0;
 	ob_init.Banks = FLASH_BANK_1;
-	// ob_init.PCROPConfig
-	// ob_init.PCROPStartAddr
-	// ob_init.PCROPEndAddr
 	// ob_init.BootConfig
 	// ob_init.BootAddr0
 	// ob_init.BootAddr1
-	// ob_init.SecureAreaConfig
-	// ob_init.SecureAreaStartAddr
-	// ob_init.SecureAreaEndAddr
-#else
 
-	ob_init.OptionType = OPTIONBYTE_BOR | OPTIONBYTE_RDP | OPTIONBYTE_WRP;
-	ob_init.WRPState = OB_WRPSTATE_ENABLE;
-	ob_init.WRPSector = OB_WRP_SECTOR_0;
-	ob_init.RDPLevel = OB_RDP_LEVEL_1;
-	ob_init.BORLevel = OB_BOR_LEVEL3;
-	// ob_init.USERType
+	ob_init.OptionType |= OPTIONBYTE_WRP;
+	ob_init.WRPState    = OB_WRPSTATE_DISABLE;
+	ob_init.WRPSector   = OB_WRP_SECTOR_All;
+
+	ob_init.OptionType |= OPTIONBYTE_RDP;
+	ob_init.RDPLevel    = OB_RDP_LEVEL_0;
+	
+	// ob_init.OptionType |= OPTIONBYTE_USER;
+	// ob_init.USERType;
 	// ob_init.USERConfig
-	ob_init.Banks = FLASH_BANK_1;
-	// ob_init.PCROPConfig
+
+	// ob_init.OptionType |= OPTIONBYTE_PCROP;
+	// ob_init.PCROPConfig = OB_PCROP_RDP_ERASE;
 	// ob_init.PCROPStartAddr
 	// ob_init.PCROPEndAddr
-	// ob_init.BootConfig
-	// ob_init.BootAddr0
-	// ob_init.BootAddr1
-	// ob_init.SecureAreaConfig
+
+	ob_init.OptionType |= OPTIONBYTE_BOR;
+	ob_init.BORLevel    = OB_BOR_LEVEL3;
+	
+	// ob_init.OptionType |= OPTIONBYTE_SECURE_AREA;
+	// ob_init.SecureAreaConfig = OB_SECURE_RDP_ERASE;
 	// ob_init.SecureAreaStartAddr
 	// ob_init.SecureAreaEndAddr
-#endif
+
 	HAL_StatusTypeDef prog_ret = HAL_FLASHEx_OBProgram(&ob_init);
 	if(prog_ret != HAL_OK)
 	{
 		return false;
 	}
+
+	HAL_FLASH_OB_Lock();
+	HAL_FLASH_Lock();
 
 	HAL_StatusTypeDef launch_ret = HAL_FLASH_OB_Launch();
 	if(launch_ret != HAL_OK)
