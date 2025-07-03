@@ -63,21 +63,83 @@ void set_all_gpio_low_power()
 	__HAL_RCC_GPIOK_CLK_DISABLE();
 }
 
+void halt_cpu()
+{
+	// Disable ISR and sync
+	__asm__ volatile (
+		"cpsid i\n"
+		"isb\n"
+		"dsb\n"
+		: 
+		: 
+		: "memory"
+	);
+
+	// Only enabled ISR or events cause wake
+	// Clear deep sleep register, sleep normal
+	// Do not sleep on return to thread mode
+	CLEAR_BIT (SCB->SCR, SCB_SCR_SEVONPEND_Msk | SCB_SCR_SLEEPDEEP_Msk | SCB_SCR_SLEEPONEXIT_Msk);
+
+	for(;;)
+	{
+		// sync SCB write, WFI, sync/reload pipeline, enable ISR, sync/reload pipeline
+		// certain platforms can crash on complex wfi return if no isb after wfi (arm core bug? - https://cliffle.com/blog/stm32-wfi-bug/)
+		__asm__ volatile (
+			"dsb\n"
+			"wfi\n"
+			"isb\n"
+			"cpsie i\n"
+			"isb\n"
+			: 
+			: 
+			: "memory"
+		);
+	}
+}
+
 int main(void)
 {
 	{
-		//errata 2.2.9
-		volatile uint32_t* AXI_TARG7_FN_MOD = 
-		reinterpret_cast<uint32_t*>(
-			0x51000000 + 
-			0x1108 + 
-			0x1000*7U
-		);
+		const uint32_t idcode = DBGMCU->IDCODE;
+		const uint16_t rev_id = (idcode & 0xFFFF0000) >> 16;
+		const uint16_t dev_id = (idcode & 0x000007FF);
 
-		const uint32_t AXI_TARGx_FN_MOD_READ_ISS_OVERRIDE  = 0x00000001;
-		const uint32_t AXI_TARGx_FN_MOD_WRITE_ISS_OVERRIDE = 0x00000002;
+		if(dev_id != 0x450)
+		{
+			// Only Dev ID STM32H7xx (42, 43/53, 50) is known
+			halt_cpu();
+		}
 
-		SET_BIT(*AXI_TARG7_FN_MOD, AXI_TARGx_FN_MOD_READ_ISS_OVERRIDE);
+		switch(rev_id)
+		{
+			case 0x1003: // Rev Y
+			{
+				//errata 2.2.9
+				uint32_t volatile * const AXI_TARG7_FN_MOD = 
+				reinterpret_cast<uint32_t*>(
+					0x51000000UL + // AXI Base
+					0x1108UL +     // TARGx offset
+					0x1000UL*7U    // Port 7, SRAM
+				);
+
+				const uint32_t AXI_TARGx_FN_MOD_READ_ISS_OVERRIDE  = 0x00000001;
+				const uint32_t AXI_TARGx_FN_MOD_WRITE_ISS_OVERRIDE = 0x00000002;
+
+				SET_BIT(*AXI_TARG7_FN_MOD, AXI_TARGx_FN_MOD_READ_ISS_OVERRIDE);
+				__DSB();
+			}
+			case 0x2003: // Rev V
+			{
+				break;
+			}
+			case 0x1001: // Rev Z
+			case 0x2001: // Rev X
+			default:
+			{
+				halt_cpu();
+				break;
+			}
+		}
 	}
 
 	//confg mpu
