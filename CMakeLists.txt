@@ -6,6 +6,12 @@ get_git_head_revision(GIT_REFSPEC GIT_SHA1)
 
 project(stm32h7_qspi_boot C CXX ASM)
 
+set(BUILD_SHARED_LIBS OFF)
+set(BUILD_STATIC_LIBS ON)
+set(INSTALL_GTEST OFF)
+set(BUILD_TESTS OFF)
+set(ENABLE_PROGRAMS OFF)
+
 set(STM32CUBEH7_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/STM32CubeH7)
 
 add_definitions(
