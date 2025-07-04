@@ -971,17 +971,18 @@ bool Bootloader_task::check_option_bytes()
 	}
 	else
 	{
-		if(ob_init.WRPState != OB_WRPSTATE_ENABLE)
+		if(ob_init.WRPState != OB_WRPSTATE_DISABLE)
 		{
 			logger->log(LOG_LEVEL::fatal, "Bootloader_task", "WRPState incorrect");
 			ret = false;
 		}
 
-		if(ob_init.WRPSector != FLASH_BANK_1)
-		{
-			logger->log(LOG_LEVEL::fatal, "Bootloader_task", "WRPSector incorrect");
-			ret = false;
-		}
+		// ob_init.WRPSector seems to be read back as 0
+		// if(ob_init.WRPSector != FLASH_BANK_1)
+		// {
+		// 	logger->log(LOG_LEVEL::fatal, "Bootloader_task", "WRPSector incorrect");
+		// 	ret = false;
+		// }
 
 		if(ob_init.RDPLevel != OB_RDP_LEVEL_0)
 		{
@@ -1033,10 +1034,10 @@ bool Bootloader_task::config_option_bytes()
 		ob_init.RDPLevel    = OB_RDP_LEVEL_0;
 	}
 
-	if((ob_init.WRPState != OB_WRPSTATE_ENABLE) || (ob_init.WRPSector != FLASH_BANK_1))
+	if(ob_init.WRPState != OB_WRPSTATE_DISABLE)
 	{
 		ob_init.OptionType |= OPTIONBYTE_WRP;
-		ob_init.WRPState    = OB_WRPSTATE_ENABLE;
+		ob_init.WRPState    = OB_WRPSTATE_DISABLE;
 		ob_init.WRPSector   = FLASH_BANK_1;
 	}
 
@@ -1048,7 +1049,7 @@ bool Bootloader_task::config_option_bytes()
 	
 	// ob_init.OptionType |= OPTIONBYTE_USER;
 	// ob_init.USERType;
-	// ob_init.USERConfig
+	// ob_init.USERConfig = RST_STOP
 
 	// ob_init.OptionType |= OPTIONBYTE_PCROP;
 	// ob_init.PCROPConfig = OB_PCROP_RDP_ERASE;
@@ -1060,8 +1061,8 @@ bool Bootloader_task::config_option_bytes()
 	// ob_init.SecureAreaStartAddr
 	// ob_init.SecureAreaEndAddr
 
-	FLASH->SR1 = 0;
-	FLASH->SR2 = 0;
+	// FLASH->SR1 = 0;
+	// FLASH->SR2 = 0;
 	HAL_StatusTypeDef prog_ret = HAL_FLASHEx_OBProgram(&ob_init);
 	if(prog_ret != HAL_OK)
 	{
