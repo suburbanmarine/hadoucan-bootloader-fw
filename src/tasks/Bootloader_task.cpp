@@ -977,7 +977,7 @@ bool Bootloader_task::check_option_bytes()
 			ret = false;
 		}
 
-		// ob_init.WRPSector seems to be read back as 0
+		// ob_init.WRPSector seems to be read back as 0 when WRPState is OB_WRPSTATE_DISABLE
 		// if(ob_init.WRPSector != FLASH_BANK_1)
 		// {
 		// 	logger->log(LOG_LEVEL::fatal, "Bootloader_task", "WRPSector incorrect");
