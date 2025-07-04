@@ -263,21 +263,11 @@ void Bootloader_task::work()
 	}
 	
 	//verify BOR, RDP, JTAG
-	if(0)
 	{
 		logger->log(LOG_LEVEL::info, "Bootloader_task", "Checking option byte");
 		if(!check_option_bytes())
 		{
 			logger->log(LOG_LEVEL::fatal, "Bootloader_task", "Option bytes incorrect, flashing");
-
-			if( (CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk) != 0)
-			{
-				logger->log(LOG_LEVEL::fatal, "Bootloader_task", "JTAG attatched, cannot continue");
-				for(;;)
-				{
-					vTaskSuspend(nullptr);
-				}
-			}
 
 			if(config_option_bytes())
 			{
@@ -294,10 +284,6 @@ void Bootloader_task::work()
 		{
 			logger->log(LOG_LEVEL::info, "Bootloader_task", "Option bytes ok");
 		}
-	}
-	else
-	{
-		logger->log(LOG_LEVEL::warn, "Bootloader_task", "Skipping option byte check");
 	}
 
 	//check for software boot mode request
@@ -971,34 +957,43 @@ bool Bootloader_task::check_option_bytes()
 {
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 
-	FLASH_OBProgramInitTypeDef ob_init;
+	FLASH_OBProgramInitTypeDef ob_init = { };
 	ob_init.Banks = FLASH_BANK_1;
 	HAL_FLASHEx_OBGetConfig(&ob_init);
 
 	bool ret = true;
 
-	if(ob_init.WRPState != OB_WRPSTATE_DISABLE)
+	const uint32_t NEEDED_OB = OPTIONBYTE_WRP | OPTIONBYTE_RDP | OPTIONBYTE_BOR;
+	if((ob_init.OptionType & NEEDED_OB) != NEEDED_OB)
 	{
-		logger->log(LOG_LEVEL::fatal, "Bootloader_task", "WRPState incorrect");
+		logger->log(LOG_LEVEL::fatal, "Bootloader_task", "Returned OptionType incorrect");
 		ret = false;
 	}
-
-	if(ob_init.WRPSector != OB_WRP_SECTOR_All)
+	else
 	{
-		logger->log(LOG_LEVEL::fatal, "Bootloader_task", "WRPSector incorrect");
-		ret = false;
-	}
+		if(ob_init.WRPState != OB_WRPSTATE_ENABLE)
+		{
+			logger->log(LOG_LEVEL::fatal, "Bootloader_task", "WRPState incorrect");
+			ret = false;
+		}
 
-	if(ob_init.RDPLevel != OB_RDP_LEVEL_0)
-	{
-		logger->log(LOG_LEVEL::fatal, "Bootloader_task", "RDPLevel incorrect");
-		ret = false;
-	}
+		if(ob_init.WRPSector != FLASH_BANK_1)
+		{
+			logger->log(LOG_LEVEL::fatal, "Bootloader_task", "WRPSector incorrect");
+			ret = false;
+		}
 
-	if(ob_init.BORLevel != OB_BOR_LEVEL3)
-	{
-		logger->log(LOG_LEVEL::fatal, "Bootloader_task", "BORLevel incorrect");
-		ret = false;
+		if(ob_init.RDPLevel != OB_RDP_LEVEL_0)
+		{
+			logger->log(LOG_LEVEL::fatal, "Bootloader_task", "RDPLevel incorrect");
+			ret = false;
+		}
+
+		if(ob_init.BORLevel != OB_BOR_LEVEL3)
+		{
+			logger->log(LOG_LEVEL::fatal, "Bootloader_task", "BORLevel incorrect");
+			ret = false;
+		}
 	}
 
 	return ret;
@@ -1006,12 +1001,25 @@ bool Bootloader_task::check_option_bytes()
 
 bool Bootloader_task::config_option_bytes()
 {
-	HAL_FLASH_Unlock();
-	HAL_FLASH_OB_Unlock();
+	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 
 	FLASH_OBProgramInitTypeDef ob_init = { };
 	ob_init.Banks = FLASH_BANK_1;
 	HAL_FLASHEx_OBGetConfig(&ob_init);
+
+	HAL_StatusTypeDef ret = HAL_FLASH_Unlock();
+	if(ret != HAL_OK)
+	{
+		logger->log(LOG_LEVEL::fatal, "Bootloader_task", "HAL_FLASH_Unlock failed");
+		return false;
+	}
+
+	ret = HAL_FLASH_OB_Unlock();
+	if(ret != HAL_OK)
+	{
+		logger->log(LOG_LEVEL::fatal, "Bootloader_task", "HAL_FLASH_OB_Unlock failed");
+		return false;
+	}
 
 	ob_init.OptionType = 0;
 	ob_init.Banks = FLASH_BANK_1;
@@ -1019,12 +1027,24 @@ bool Bootloader_task::config_option_bytes()
 	// ob_init.BootAddr0
 	// ob_init.BootAddr1
 
-	ob_init.OptionType |= OPTIONBYTE_WRP;
-	ob_init.WRPState    = OB_WRPSTATE_DISABLE;
-	ob_init.WRPSector   = OB_WRP_SECTOR_All;
+	if(ob_init.RDPLevel != OB_RDP_LEVEL_0)
+	{
+		ob_init.OptionType |= OPTIONBYTE_RDP;
+		ob_init.RDPLevel    = OB_RDP_LEVEL_0;
+	}
 
-	ob_init.OptionType |= OPTIONBYTE_RDP;
-	ob_init.RDPLevel    = OB_RDP_LEVEL_0;
+	if((ob_init.WRPState != OB_WRPSTATE_ENABLE) || (ob_init.WRPSector != FLASH_BANK_1))
+	{
+		ob_init.OptionType |= OPTIONBYTE_WRP;
+		ob_init.WRPState    = OB_WRPSTATE_ENABLE;
+		ob_init.WRPSector   = FLASH_BANK_1;
+	}
+
+	if(ob_init.BORLevel != OB_BOR_LEVEL3)
+	{
+		ob_init.OptionType |= OPTIONBYTE_BOR;
+		ob_init.BORLevel    = OB_BOR_LEVEL3;
+	}
 	
 	// ob_init.OptionType |= OPTIONBYTE_USER;
 	// ob_init.USERType;
@@ -1034,27 +1054,39 @@ bool Bootloader_task::config_option_bytes()
 	// ob_init.PCROPConfig = OB_PCROP_RDP_ERASE;
 	// ob_init.PCROPStartAddr
 	// ob_init.PCROPEndAddr
-
-	ob_init.OptionType |= OPTIONBYTE_BOR;
-	ob_init.BORLevel    = OB_BOR_LEVEL3;
 	
 	// ob_init.OptionType |= OPTIONBYTE_SECURE_AREA;
 	// ob_init.SecureAreaConfig = OB_SECURE_RDP_ERASE;
 	// ob_init.SecureAreaStartAddr
 	// ob_init.SecureAreaEndAddr
 
+	FLASH->SR1 = 0;
+	FLASH->SR2 = 0;
 	HAL_StatusTypeDef prog_ret = HAL_FLASHEx_OBProgram(&ob_init);
 	if(prog_ret != HAL_OK)
 	{
+		logger->log(LOG_LEVEL::fatal, "Bootloader_task", "HAL_FLASHEx_OBProgram failed");
 		return false;
 	}
-
-	HAL_FLASH_OB_Lock();
-	HAL_FLASH_Lock();
 
 	HAL_StatusTypeDef launch_ret = HAL_FLASH_OB_Launch();
 	if(launch_ret != HAL_OK)
 	{
+		logger->log(LOG_LEVEL::fatal, "Bootloader_task", "HAL_FLASH_OB_Launch failed");
+		return false;
+	}
+
+	ret = HAL_FLASH_OB_Lock();
+	if(ret != HAL_OK)
+	{
+		logger->log(LOG_LEVEL::fatal, "Bootloader_task", "HAL_FLASH_OB_Lock failed");
+		return false;
+	}
+
+	ret = HAL_FLASH_Lock();
+	if(ret != HAL_OK)
+	{
+		logger->log(LOG_LEVEL::fatal, "Bootloader_task", "HAL_FLASH_Lock failed");
 		return false;
 	}
 
