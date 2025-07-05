@@ -419,7 +419,6 @@ void Bootloader_task::work()
 			logger->log(LOG_LEVEL::info, "Bootloader_task", "App load requested");
 
 			logger->log(LOG_LEVEL::info, "Bootloader_task", "Looking for bin gcm file");
-			/*
 			if(load_verify_bin_gcm_app_image())
 			{
 				for(;;)
@@ -428,7 +427,6 @@ void Bootloader_task::work()
 				}
 			}
 			else
-			*/
 			{
 				logger->log(LOG_LEVEL::info, "Bootloader_task", "Looking for hex file");
 				if(load_verify_hex_app_image())
