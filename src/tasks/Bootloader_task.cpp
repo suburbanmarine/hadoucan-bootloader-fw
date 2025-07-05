@@ -526,8 +526,8 @@ bool Bootloader_task::load_verify_hex_app_image()
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 
 	const char* fname = "app.hex";
-	lfs_file_t fd = { };
-	int ret = lfs_file_open(m_fs.get_fs(), &fd, fname, LFS_O_RDONLY);
+	LFS_file file(&m_fs);
+	int ret = file.open(fname, LFS_O_RDONLY);
 	if(ret < 0)
 	{
 		logger->log(LOG_LEVEL::error, "Bootloader_task", "Opening file %s failed: %" PRId32, fname, ret);
@@ -555,7 +555,7 @@ bool Bootloader_task::load_verify_hex_app_image()
 	lfs_ssize_t read_ret = 0;
 	do
 	{
-		read_ret = lfs_file_read(m_fs.get_fs(), &fd, read_buffer.data(), read_buffer.size());
+		read_ret = lfs_file_read(m_fs.get_fs(), file.get_fd(), read_buffer.data(), read_buffer.size());
 		if(read_ret < 0)
 		{
 			return false;
@@ -588,7 +588,7 @@ bool Bootloader_task::load_verify_hex_app_image()
 		} while(line_it != file_buffer.end());
 	} while(read_ret > 0);
 	
-	int close_ret = lfs_file_close(m_fs.get_fs(), &fd);
+	int close_ret = file.close();
 	if(close_ret != LFS_ERR_OK)
 	{
 		logger->log(LOG_LEVEL::error, "Bootloader_task", "close file %s failed: %" PRId32, fname, close_ret);
@@ -607,6 +607,35 @@ bool Bootloader_task::load_verify_hex_app_image()
 		Byte_util::u8_to_hex(md5_output[i], md5_output_hex.data() + 2*i);
 	}
 	logger->log(LOG_LEVEL::debug, "Bootloader_task", "File checksum: %s", md5_output_hex.data());
+
+	{
+		LFS_file md5_file(&m_fs);
+		int ret = md5_file.open("app.hex.md5", LFS_O_RDONLY);
+		if(ret < 0)
+		{
+			return false;
+		}
+
+		std::array<unsigned char, 16> md5_input;
+		read_ret = lfs_file_read(m_fs.get_fs(), md5_file.get_fd(), md5_input.data(), md5_input.size());
+		if(read_ret < 0)
+		{
+			return false;
+		}
+		if(read_ret != md5_input.size())
+		{
+			return false;
+		}
+
+		md5_file.close();
+
+		if( ! std::equal(md5_output.begin(), md5_output.end(), md5_input.begin()) )
+		{
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "File checksum match fail");
+			return false;
+		}
+		logger->log(LOG_LEVEL::debug, "Bootloader_task", "File checksum match ok");
+	}
 
 	if(hex_loader.has_eof())
 	{
@@ -642,8 +671,8 @@ bool Bootloader_task::load_verify_bin_app_image()
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 
 	const char* fname = "app.bin";
-	lfs_file_t fd = { };
-	int ret = lfs_file_open(m_fs.get_fs(), &fd, fname, LFS_O_RDONLY);
+	LFS_file file(&m_fs);
+	int ret = file.open(fname, LFS_O_RDONLY);
 	if(ret < 0)
 	{
 		logger->log(LOG_LEVEL::error, "Bootloader_task", "Opening file %s failed: %" PRId32, fname, ret);
@@ -665,7 +694,7 @@ bool Bootloader_task::load_verify_bin_app_image()
 	lfs_ssize_t read_ret = 0;
 	do
 	{
-		read_ret = lfs_file_read(m_fs.get_fs(), &fd, read_buffer.data(), read_buffer.size());
+		read_ret = lfs_file_read(m_fs.get_fs(), file.get_fd(), read_buffer.data(), read_buffer.size());
 		if(read_ret < 0)
 		{
 			return false;
@@ -678,7 +707,7 @@ bool Bootloader_task::load_verify_bin_app_image()
 
 	} while(read_ret > 0);
 	
-	int close_ret = lfs_file_close(m_fs.get_fs(), &fd);
+	int close_ret = file.close();
 	if(close_ret != LFS_ERR_OK)
 	{
 		logger->log(LOG_LEVEL::error, "Bootloader_task", "close file %s failed: %" PRId32, fname, close_ret);
@@ -697,6 +726,35 @@ bool Bootloader_task::load_verify_bin_app_image()
 		Byte_util::u8_to_hex(md5_output[i], md5_output_hex.data() + 2*i);
 	}
 	logger->log(LOG_LEVEL::debug, "Bootloader_task", "File checksum: %s", md5_output_hex.data());
+
+	{
+		LFS_file md5_file(&m_fs);
+		int ret = md5_file.open("app.bin.md5", LFS_O_RDONLY);
+		if(ret < 0)
+		{
+			return false;
+		}
+
+		std::array<unsigned char, 16> md5_input;
+		read_ret = lfs_file_read(m_fs.get_fs(), md5_file.get_fd(), md5_input.data(), md5_input.size());
+		if(read_ret < 0)
+		{
+			return false;
+		}
+		if(read_ret != md5_input.size())
+		{
+			return false;
+		}
+
+		md5_file.close();
+
+		if( ! std::equal(md5_output.begin(), md5_output.end(), md5_input.begin()) )
+		{
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "File checksum match fail");
+			return false;
+		}
+		logger->log(LOG_LEVEL::debug, "Bootloader_task", "File checksum match ok");
+	}
 
 	uint32_t app_estack = 0;
 	uint32_t app_reset_handler = 0;
