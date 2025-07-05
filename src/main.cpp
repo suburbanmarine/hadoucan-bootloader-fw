@@ -468,19 +468,8 @@ int main(void)
 		HAL_RCC_MCOConfig(RCC_MCO1, RCC_MCO1SOURCE_HSE, RCC_MCODIV_1);
 	}
 
-	{
-		std::array<char, 25> id_str;
-		Bootloader_task::get_unique_id_str(&id_str);
-		// uart1_log<64>(LOG_LEVEL::INFO, "main", "Initialing");
-		// uart1_log<64>(LOG_LEVEL::INFO, "main", "P/N: STM32H750 Bootloader");
-		// uart1_log<64>(LOG_LEVEL::INFO, "main", "S/N: %s", id_str.data());
-	}
-
-
 	bootloader_task.launch("bootloader_task", 2);
 	led_task.launch("led", 2);
-
-	// uart1_log<64>(LOG_LEVEL::INFO, "main", "Ready");
 
 	vTaskStartScheduler();
 
