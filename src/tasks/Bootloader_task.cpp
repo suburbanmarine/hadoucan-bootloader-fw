@@ -96,7 +96,7 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 	if((offset + length) > m_mem_size)
 	{
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
-		return;		
+		return;
 	}
 
 	memcpy(m_mem_base + offset, data, length);
