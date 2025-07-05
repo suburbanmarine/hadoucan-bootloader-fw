@@ -48,13 +48,17 @@ public:
 		}
 
 		m_fd = std::make_unique<lfs_file_t>();
-		if(! m_fd )
+		if( ! m_fd )
 		{
 			return -1;
 		}
 		*m_fd = {};
 
 		int ret = lfs_file_open(m_fs->get_fs(), get_fd(), path, flags);
+		if(ret < 0)
+		{
+			m_fd.reset();
+		}
 
 		return ret;
 	}
