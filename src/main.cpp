@@ -97,6 +97,13 @@ void halt_cpu()
 	}
 }
 
+#ifdef SEMIHOSTING
+extern "C"
+{
+	extern void initialise_monitor_handles();
+}
+#endif
+
 int main(void)
 {
 	// If JTAG is attached, keep clocks on during sleep
@@ -113,7 +120,6 @@ int main(void)
 			  | DBGMCU_CR_DBG_CKD1EN
 			  | DBGMCU_CR_DBG_CKD3EN
 			;
-
 			__asm__ volatile (
 				"dsb\n"
 				: 
@@ -123,6 +129,7 @@ int main(void)
 		}
 	}
 
+	// Handle errata
 	{
 		const uint32_t idcode = DBGMCU->IDCODE;
 		const uint16_t rev_id = (idcode & 0xFFFF0000) >> 16;
@@ -164,6 +171,13 @@ int main(void)
 				break;
 			}
 		}
+	}
+
+	// Enable semihosting if requested
+	{
+		#ifdef SEMIHOSTING
+			initialise_monitor_handles();
+		#endif
 	}
 
 	//confg mpu
