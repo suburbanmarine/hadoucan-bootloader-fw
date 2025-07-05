@@ -454,6 +454,7 @@ void Bootloader_task::work()
 	}
 
 	logger->log(LOG_LEVEL::info, "Bootloader_task", "Starting usb");
+	led_task.set_state(LED_task::LED_STATE::WAIT_FOR_HOST);
 	init_usb();
 
 	for(;;)

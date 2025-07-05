@@ -478,7 +478,7 @@ int main(void)
 
 
 	bootloader_task.launch("bootloader_task", 2);
-	led_task.launch("led", 1);
+	led_task.launch("led", 2);
 
 	// uart1_log<64>(LOG_LEVEL::INFO, "main", "Ready");
 
