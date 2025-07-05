@@ -239,6 +239,12 @@ void Bootloader_task::work()
 		Bootloader_task::get_unique_id_str(&id_str);
 		logger->log(LOG_LEVEL::info, "Bootloader_task", "P/N: STM32H750 Bootloader");
 		logger->log(LOG_LEVEL::info, "Bootloader_task", "S/N: %s", id_str.data());
+
+		const uint32_t idcode = DBGMCU->IDCODE;
+		const uint16_t rev_id = (idcode & 0xFFFF0000) >> 16;
+		const uint16_t dev_id = (idcode & 0x000007FF);
+		logger->log(LOG_LEVEL::info, "Bootloader_task", "rev_id: 0x%04X", rev_id);
+		logger->log(LOG_LEVEL::info, "Bootloader_task", "dev_id: 0x%04X", dev_id);
 	}
 
 	m_qspi.set_handle(&hqspi);
