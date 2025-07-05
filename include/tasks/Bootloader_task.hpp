@@ -7,11 +7,72 @@
 
 #include "freertos_cpp_util/Task_static.hpp"
 
+#include <mbedtls/md5.h>
+
 #include "tinyxml2/tinyxml2.h"
 
 #include "tusb.h"
 
 #include <memory>
+
+class LFS_file
+{
+public:
+	LFS_file(LFS_int* const fs)
+	{
+		m_fs = fs;
+	}
+	virtual ~LFS_file()
+	{
+		if(m_fd)
+		{
+			if(lfs_file_close(m_fs->get_fs(), m_fd.get()) < 0)
+			{
+				// Log?
+			}
+		}
+
+		m_fd.reset();
+	}
+
+	lfs_file_t* get_fd()
+	{
+		return m_fd.get();
+	}
+
+	int open(const char* path, int flags)
+	{
+		if(m_fd)
+		{
+			return -1;
+		}
+
+		m_fd = std::make_unique<lfs_file_t>();
+		if(! m_fd )
+		{
+			return -1;
+		}
+		*m_fd = {};
+
+		int ret = lfs_file_open(m_fs->get_fs(), get_fd(), path, flags);
+
+		return ret;
+	}
+
+	int close()
+	{
+		int ret = lfs_file_close(m_fs->get_fs(), get_fd());
+		m_fd.reset();
+		return ret;
+	}
+
+private:
+	LFS_file(const LFS_file& rhs) = delete;
+	LFS_file& operator=(const LFS_file& rhs) = delete;
+
+	LFS_int* m_fs;
+	std::unique_ptr<lfs_file_t> m_fd;
+};
 
 class Bootloader_task : public Task_static<2048>
 {
@@ -76,7 +137,8 @@ protected:
 
 	std::array<char, 25> usb_id_str;
 
-	std::shared_ptr<lfs_file_t> m_fd;
+	std::shared_ptr<LFS_file> m_fd;
+	mbedtls_md5_context m_fd_md5_ctx;
 
 	uint8_t* const m_mem_base          = reinterpret_cast<uint8_t*>(0x24000000);
 	const size_t m_mem_size            = 512*1024*1024;

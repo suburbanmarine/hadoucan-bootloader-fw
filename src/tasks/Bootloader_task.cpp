@@ -19,8 +19,6 @@
 
 #include "global_inst.hpp"
 
-#include <mbedtls/md5.h>
-
 #include <tusb.h>
 
 #include <cctype>
@@ -56,6 +54,8 @@ uint32_t Bootloader_task::handle_tud_dfu_get_timeout_cb(uint8_t alt, uint8_t sta
 }
 void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num, uint8_t const *data, uint16_t length)
 {
+	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
+
 	if(alt != 0)
 	{
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
@@ -66,21 +66,22 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 	{
 		if( m_fd )
 		{
-			if(lfs_file_close(m_fs.get_fs(), m_fd.get()) < 0)
-			{
-				tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
-				return;
-			}
-
 			m_fd.reset();
 		}
 
-		m_fd = std::make_shared<lfs_file_t>();
-		if(lfs_file_open(m_fs.get_fs(), m_fd.get(), "app.bin.tmp", LFS_O_CREAT | LFS_O_TRUNC | LFS_O_RDWR) < 0)
+		m_fd = std::make_shared<LFS_file>(&m_fs);
+		if(m_fd->open("app.bin.tmp", LFS_O_CREAT | LFS_O_TRUNC | LFS_O_RDWR) < 0)
 		{
 			m_fd.reset();
 			tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
 			return;
+		}
+
+		mbedtls_md5_init(&m_fd_md5_ctx);
+		if(mbedtls_md5_starts_ret(&m_fd_md5_ctx) != 0)
+		{
+			m_fd.reset();
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
 		}
 	}
 
@@ -101,8 +102,15 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 
 	memcpy(m_mem_base + offset, data, length);
 
+	if(mbedtls_md5_update_ret(&m_fd_md5_ctx, data, length) != 0)
+	{
+		m_fd.reset();
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
+		return;
+	}
+
 	// Commit to flash
-	lfs_ssize_t ret = lfs_file_write(m_fs.get_fs(), m_fd.get(), data, length);
+	lfs_ssize_t ret = lfs_file_write(m_fs.get_fs(), m_fd->get_fd(), data, length);
 	if((ret < 0) || (ret != length))
 	{
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
@@ -113,25 +121,75 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 }
 void Bootloader_task::handle_tud_dfu_manifest_cb(uint8_t alt)
 {
+	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
+
 	if(alt != 0)
 	{
+		m_fd.reset();
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
 		return;
 	}
 
 	if( ! m_fd )
 	{
+		m_fd.reset();
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
 		return;
 	}
 
 	// Close file
-	if(lfs_file_close(m_fs.get_fs(), m_fd.get()) < 0)
+	if(m_fd->close() < 0)
 	{
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
 		return;
 	}
 	m_fd.reset();
+
+	// Write out the checksum
+	{
+		std::array<unsigned char, 16> md5_output;
+		if(mbedtls_md5_finish_ret(&m_fd_md5_ctx, md5_output.data() ) != 0)
+		{
+			m_fd.reset();
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
+			return;
+		}
+		mbedtls_md5_free(&m_fd_md5_ctx);
+
+		LFS_file md5_file(&m_fs);
+		if(md5_file.open("app.bin.md5.tmp", LFS_O_CREAT | LFS_O_TRUNC | LFS_O_RDWR) < 0)
+		{
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+			return;
+		}
+
+		lfs_ssize_t ret = lfs_file_write(m_fs.get_fs(), md5_file.get_fd(), md5_output.data(), md5_output.size());
+		if((ret < 0) || (ret != md5_output.size()))
+		{
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
+			return;
+		}
+
+		if(md5_file.close() < 0)
+		{
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
+			return;
+		}
+
+		if(lfs_rename(m_fs.get_fs(), "app.bin.md5.tmp", "app.bin.md5") < 0)
+		{
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
+			return;
+		}
+
+		std::array<char, 33> md5_output_hex;
+		md5_output_hex.back() = '\0';
+		for(size_t i = 0; i < 16; i++)
+		{
+			Byte_util::u8_to_hex(md5_output[i], md5_output_hex.data() + 2*i);
+		}
+		logger->log(LOG_LEVEL::debug, "Bootloader_task", "New firmware checksum: %s", md5_output_hex.data());
+	}
 
 	// Rename file
 	if(lfs_rename(m_fs.get_fs(), "app.bin.tmp", "app.bin") < 0)
@@ -140,10 +198,14 @@ void Bootloader_task::handle_tud_dfu_manifest_cb(uint8_t alt)
 		return;
 	}
 
+	logger->log(LOG_LEVEL::debug, "Bootloader_task", "New firmware written");
+
 	tud_dfu_finish_flashing(DFU_STATUS_OK);
 }
 uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_num, uint8_t* data, uint16_t length)
 {
+	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
+
 	if(alt != 0)
 	{
 		return 0;
@@ -153,16 +215,11 @@ uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_n
 	{
 		if( m_fd )
 		{
-			if(lfs_file_close(m_fs.get_fs(), m_fd.get()) < 0)
-			{
-				return 0;
-			}
-
 			m_fd.reset();
 		}
 
-		m_fd = std::make_shared<lfs_file_t>();
-		if(lfs_file_open(m_fs.get_fs(), m_fd.get(), "app.bin", LFS_O_RDONLY) < 0)
+		m_fd = std::make_shared<LFS_file>(&m_fs);
+		if(m_fd->open("app.bin", LFS_O_RDONLY) < 0)
 		{
 			m_fd.reset();
 			return 0;
@@ -178,24 +235,16 @@ uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_n
 	const lfs_soff_t offset = lfs_soff_t(block_num) * lfs_soff_t(m_download_block_size);
 
 	// Read from flash
-	lfs_soff_t ret = lfs_file_seek(m_fs.get_fs(), m_fd.get(), offset, LFS_SEEK_SET);
+	lfs_soff_t ret = lfs_file_seek(m_fs.get_fs(), m_fd->get_fd(), offset, LFS_SEEK_SET);
 	if(ret != offset)
 	{
-		if(lfs_file_close(m_fs.get_fs(), m_fd.get()) < 0)
-		{
-			// Log?
-		}
 		m_fd.reset();
 		return 0;
 	}
 
-	lfs_ssize_t read_ret = lfs_file_read(m_fs.get_fs(), m_fd.get(), data, length);
+	lfs_ssize_t read_ret = lfs_file_read(m_fs.get_fs(), m_fd->get_fd(), data, length);
 	if(read_ret < 0)
 	{
-		if(lfs_file_close(m_fs.get_fs(), m_fd.get()) < 0)
-		{
-			// Log?
-		}
 		m_fd.reset();
 		return 0;
 	}
