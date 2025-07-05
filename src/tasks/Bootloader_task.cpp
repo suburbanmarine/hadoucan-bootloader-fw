@@ -558,6 +558,7 @@ bool Bootloader_task::load_verify_hex_app_image()
 		read_ret = lfs_file_read(m_fs.get_fs(), file.get_fd(), read_buffer.data(), read_buffer.size());
 		if(read_ret < 0)
 		{
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "Error loading app file");
 			return false;
 		}
 
@@ -610,20 +611,18 @@ bool Bootloader_task::load_verify_hex_app_image()
 
 	{
 		LFS_file md5_file(&m_fs);
-		int ret = md5_file.open("app.hex.md5", LFS_O_RDONLY);
+		ret = md5_file.open("app.hex.md5", LFS_O_RDONLY);
 		if(ret < 0)
 		{
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "Error loading app file checksum");
 			return false;
 		}
 
 		std::array<unsigned char, 16> md5_input;
 		read_ret = lfs_file_read(m_fs.get_fs(), md5_file.get_fd(), md5_input.data(), md5_input.size());
-		if(read_ret < 0)
-		{
-			return false;
-		}
 		if(read_ret != md5_input.size())
 		{
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "Error loading app file checksum");
 			return false;
 		}
 
@@ -697,6 +696,7 @@ bool Bootloader_task::load_verify_bin_app_image()
 		read_ret = lfs_file_read(m_fs.get_fs(), file.get_fd(), read_buffer.data(), read_buffer.size());
 		if(read_ret < 0)
 		{
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "Error loading app file");
 			return false;
 		}
 
@@ -729,20 +729,18 @@ bool Bootloader_task::load_verify_bin_app_image()
 
 	{
 		LFS_file md5_file(&m_fs);
-		int ret = md5_file.open("app.bin.md5", LFS_O_RDONLY);
+		ret = md5_file.open("app.bin.md5", LFS_O_RDONLY);
 		if(ret < 0)
 		{
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "Error loading app file checksum");
 			return false;
 		}
 
 		std::array<unsigned char, 16> md5_input;
 		read_ret = lfs_file_read(m_fs.get_fs(), md5_file.get_fd(), md5_input.data(), md5_input.size());
-		if(read_ret < 0)
-		{
-			return false;
-		}
 		if(read_ret != md5_input.size())
 		{
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "Error loading app file checksum");
 			return false;
 		}
 
