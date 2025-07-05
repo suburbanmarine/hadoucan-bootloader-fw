@@ -149,7 +149,6 @@ target_include_directories(stm32h7_qspi_boot.elf
 )
 
 target_link_libraries(stm32h7_qspi_boot.elf
-
 	stm32h7xx_hal
 	stm32h7xx_ll
 	stm32h750xx_cmsis
@@ -182,6 +181,16 @@ target_link_libraries(stm32h7_qspi_boot.elf
 
 	tinyxml2_static
 )
+
+if(SEMIHOSTING)
+	target_link_libraries(stm32h7_qspi_boot.elf
+		rdimon
+	)
+	target_compile_definitions(stm32h7_qspi_boot.elf
+		PRIVATE
+			-DSEMIHOSTING
+	)
+endif()
 
 # Generate intel hex image
 add_custom_command(

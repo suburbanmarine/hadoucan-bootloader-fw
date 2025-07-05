@@ -5,6 +5,8 @@
 #include "hal_inst.h"
 #include "stm32h7xx_hal.h"
 
+#include <cstdio>
+
 bool UART1_sink::handle_log(freertos_util::logging::String_type* const log)
 {
 	HAL_StatusTypeDef uartret;
@@ -14,6 +16,17 @@ bool UART1_sink::handle_log(freertos_util::logging::String_type* const log)
 	}
 
 	return uartret == HAL_OK;
+}
+
+bool Semihosting_sink::handle_log(freertos_util::logging::String_type* const log)
+{
+	size_t uartret;
+	{
+		std::lock_guard<Mutex_static> lock(m_uart1_mutex);
+		uartret = ::fwrite(log->c_str(), 1, log->size(), stdout);
+	}
+
+	return uartret == log->size();
 }
 
 void Logging_task::work()

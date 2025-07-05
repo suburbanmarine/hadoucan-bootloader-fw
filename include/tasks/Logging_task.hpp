@@ -11,6 +11,14 @@ public:
 protected:
 };
 
+class Semihosting_sink : public freertos_util::logging::Log_sink_base
+{
+public:
+	bool handle_log(freertos_util::logging::String_type* const log) override;
+
+protected:
+};
+
 // extern freertos_util::logging::Logger global_logs;
 
 class Logging_task : public Task_static<1024>
@@ -31,6 +39,10 @@ public:
 protected:
 
 	freertos_util::logging::Logger global_logs;
-
+#ifdef SEMIHOSTING
+	Semihosting_sink m_sink;
+#else
 	UART1_sink m_sink;
+#endif
+	
 };
