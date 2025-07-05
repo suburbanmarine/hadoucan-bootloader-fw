@@ -968,6 +968,7 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 	__HAL_RCC_AHB1_FORCE_RESET();
 	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_AHB1_RELEASE_RESET();
+	
 	__HAL_RCC_AHB2_FORCE_RESET();
 	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_AHB2_RELEASE_RESET();
@@ -1002,15 +1003,19 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 	__HAL_RCC_APB1L_FORCE_RESET();
 	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_APB1L_RELEASE_RESET();
+
 	__HAL_RCC_APB1H_FORCE_RESET();
 	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_APB1H_RELEASE_RESET();
+
 	__HAL_RCC_APB2_FORCE_RESET();
 	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_APB2_RELEASE_RESET();
+
 	__HAL_RCC_APB3_FORCE_RESET();
 	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_APB3_RELEASE_RESET();
+
 	__HAL_RCC_APB4_FORCE_RESET();
 	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_APB4_RELEASE_RESET();
