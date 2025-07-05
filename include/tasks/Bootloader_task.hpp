@@ -35,6 +35,11 @@ public:
 		m_fd.reset();
 	}
 
+	lfs_t* get_fs()
+	{
+		return m_fs->get_fs();
+	}
+
 	lfs_file_t* get_fd()
 	{
 		return m_fd.get();
@@ -54,7 +59,7 @@ public:
 		}
 		*m_fd = {};
 
-		int ret = lfs_file_open(m_fs->get_fs(), get_fd(), path, flags);
+		int ret = lfs_file_open(get_fs(), get_fd(), path, flags);
 		if(ret < 0)
 		{
 			m_fd.reset();
@@ -65,7 +70,7 @@ public:
 
 	int close()
 	{
-		int ret = lfs_file_close(m_fs->get_fs(), get_fd());
+		int ret = lfs_file_close(get_fs(), get_fd());
 		m_fd.reset();
 		return ret;
 	}
