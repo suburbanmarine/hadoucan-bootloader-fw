@@ -64,9 +64,9 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 
 	if(block_num == 0)
 	{
-		if( m_fd.has_value() )
+		if( m_fd )
 		{
-			if(lfs_file_close(m_fs.get_fs(), &(m_fd.value())) < 0)
+			if(lfs_file_close(m_fs.get_fs(), m_fd.get()) < 0)
 			{
 				tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
 				return;
@@ -75,17 +75,16 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 			m_fd.reset();
 		}
 
-		lfs_file_t fd = { };
-		if(lfs_file_open(m_fs.get_fs(), &fd, "app.bin.tmp", LFS_O_CREAT | LFS_O_TRUNC | LFS_O_RDWR) < 0)
+		m_fd = std::make_shared<lfs_file_t>();
+		if(lfs_file_open(m_fs.get_fs(), m_fd.get(), "app.bin.tmp", LFS_O_CREAT | LFS_O_TRUNC | LFS_O_RDWR) < 0)
 		{
+			m_fd.reset();
 			tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
 			return;
 		}
-
-		m_fd = fd;
 	}
 
-	if( ! m_fd.has_value() )
+	if( ! m_fd )
 	{
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
 		return;
@@ -103,7 +102,7 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 	memcpy(m_mem_base + offset, data, length);
 
 	// Commit to flash
-	lfs_ssize_t ret = lfs_file_write(m_fs.get_fs(), &(m_fd.value()), data, length);
+	lfs_ssize_t ret = lfs_file_write(m_fs.get_fs(), m_fd.get(), data, length);
 	if((ret < 0) || (ret != length))
 	{
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
@@ -120,14 +119,14 @@ void Bootloader_task::handle_tud_dfu_manifest_cb(uint8_t alt)
 		return;
 	}
 
-	if( ! m_fd.has_value() )
+	if( ! m_fd )
 	{
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
 		return;
 	}
 
 	// Close file
-	if(lfs_file_close(m_fs.get_fs(), &m_fd.value()) < 0)
+	if(lfs_file_close(m_fs.get_fs(), m_fd.get()) < 0)
 	{
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
 		return;
@@ -152,9 +151,9 @@ uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_n
 
 	if(block_num == 0)
 	{
-		if( m_fd.has_value() )
+		if( m_fd )
 		{
-			if(lfs_file_close(m_fs.get_fs(), &m_fd.value()) < 0)
+			if(lfs_file_close(m_fs.get_fs(), m_fd.get()) < 0)
 			{
 				return 0;
 			}
@@ -162,15 +161,15 @@ uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_n
 			m_fd.reset();
 		}
 
-		lfs_file_t fd = { };
-		if(lfs_file_open(m_fs.get_fs(), &fd, "app.bin", LFS_O_RDONLY) < 0)
+		m_fd = std::make_shared<lfs_file_t>();
+		if(lfs_file_open(m_fs.get_fs(), m_fd.get(), "app.bin", LFS_O_RDONLY) < 0)
 		{
+			m_fd.reset();
 			return 0;
 		}
-		m_fd = fd;
 	}
 
-	if( ! m_fd.has_value() )
+	if( ! m_fd )
 	{
 		return 0;
 	}
@@ -179,15 +178,25 @@ uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_n
 	const lfs_soff_t offset = lfs_soff_t(block_num) * lfs_soff_t(m_download_block_size);
 
 	// Read from flash
-	lfs_soff_t ret = lfs_file_seek(m_fs.get_fs(), &m_fd.value(), offset, LFS_SEEK_SET);
+	lfs_soff_t ret = lfs_file_seek(m_fs.get_fs(), m_fd.get(), offset, LFS_SEEK_SET);
 	if(ret != offset)
 	{
+		if(lfs_file_close(m_fs.get_fs(), m_fd.get()) < 0)
+		{
+			// Log?
+		}
+		m_fd.reset();
 		return 0;
 	}
 
-	lfs_ssize_t read_ret = lfs_file_read(m_fs.get_fs(), &m_fd.value(), data, length);
+	lfs_ssize_t read_ret = lfs_file_read(m_fs.get_fs(), m_fd.get(), data, length);
 	if(read_ret < 0)
 	{
+		if(lfs_file_close(m_fs.get_fs(), m_fd.get()) < 0)
+		{
+			// Log?
+		}
+		m_fd.reset();
 		return 0;
 	}
 
@@ -410,6 +419,7 @@ void Bootloader_task::work()
 			logger->log(LOG_LEVEL::info, "Bootloader_task", "App load requested");
 
 			logger->log(LOG_LEVEL::info, "Bootloader_task", "Looking for bin gcm file");
+			/*
 			if(load_verify_bin_gcm_app_image())
 			{
 				for(;;)
@@ -418,6 +428,7 @@ void Bootloader_task::work()
 				}
 			}
 			else
+			*/
 			{
 				logger->log(LOG_LEVEL::info, "Bootloader_task", "Looking for hex file");
 				if(load_verify_hex_app_image())

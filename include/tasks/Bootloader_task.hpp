@@ -11,7 +11,7 @@
 
 #include "tusb.h"
 
-#include <optional>
+#include <memory>
 
 class Bootloader_task : public Task_static<2048>
 {
@@ -76,7 +76,8 @@ protected:
 
 	std::array<char, 25> usb_id_str;
 
-	std::optional<lfs_file_t> m_fd;
+	std::shared_ptr<lfs_file_t> m_fd;
+
 	uint8_t* const m_mem_base          = reinterpret_cast<uint8_t*>(0x24000000);
 	const size_t m_mem_size            = 512*1024*1024;
 	const size_t m_download_block_size = CFG_TUD_DFU_XFER_BUFSIZE;
