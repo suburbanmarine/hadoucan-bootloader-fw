@@ -188,7 +188,7 @@ int main(void)
 		Bootloader_key boot_key;
 		boot_key.from_addr(reinterpret_cast<uint8_t const *>(0x38800000));
 
-		std::array<uint8_t, 16> md5_axi = Bootloader_task::calculate_md5_axi_sram();
+		std::array<uint8_t, 16> md5_axi = Bootloader_task::calculate_md5_axi_sram(boot_key.app_length);
 
 		if(boot_key.verify())
 		{

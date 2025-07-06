@@ -475,10 +475,9 @@ void Bootloader_task::work()
 
 				// See 2.4 Embedded SRAM note Error code correction
 				// Write are delayed in the event of a less than ecc sized write
-				// Scrub SRAM areas needed to be preserved before resetting
-				SCB_CleanDCache();
-				ecc_scrub_axi_sram();
-				ecc_scrub_bbram();
+				// Flush SRAM areas needed to be preserved before resetting
+				ecc_flush_axi_sram();
+				ecc_flush_bbram();
 				
 				sync_and_reset();
 
@@ -490,54 +489,28 @@ void Bootloader_task::work()
 			else
 			*/
 			{
-				logger->log(LOG_LEVEL::info, "Bootloader_task", "Looking for hex file");
-				if(load_verify_hex_app_image())
+				Bootloader_key key;
+				logger->log(LOG_LEVEL::info, "Bootloader_task", "Looking for bin file");
+				if(load_verify_bin_app_image(&key))
 				{
 					logger->log(LOG_LEVEL::info, "Bootloader_task", "App load complete, resetting");
-					std::array<uint8_t, 16> md5_axi = calculate_md5_axi_sram();
-					set_bootloader_key(Bootloader_key::Bootloader_ops::RUN_APP, md5_axi);
+
 					// See 2.4 Embedded SRAM note Error code correction
 					// Write are delayed in the event of a less than ecc sized write
-					// Scrub SRAM areas needed to be preserved before resetting
-					SCB_CleanDCache();
-					ecc_scrub_axi_sram();
-					ecc_scrub_bbram();
+					// Flush SRAM areas needed to be preserved before resetting
+					ecc_flush_axi_sram(key.app_length);
+					ecc_flush_bbram(Bootloader_key::LENGTH_IN_BYTES);
 
 					sync_and_reset();
 
 					for(;;)
 					{
 
-					}
+					}					
 				}
-				else 
+				else
 				{
-					logger->log(LOG_LEVEL::info, "Bootloader_task", "Looking for bin file");
-					if(load_verify_bin_app_image())
-					{
-						logger->log(LOG_LEVEL::info, "Bootloader_task", "App load complete, resetting");
-						std::array<uint8_t, 16> md5_axi = calculate_md5_axi_sram();
-						set_bootloader_key(Bootloader_key::Bootloader_ops::RUN_APP, md5_axi);
-
-						// See 2.4 Embedded SRAM note Error code correction
-						// Write are delayed in the event of a less than ecc sized write
-						// Scrub SRAM areas needed to be preserved before resetting
-						SCB_CleanDCache();
-						SCB_DisableDCache();
-						ecc_scrub_axi_sram();
-						ecc_scrub_bbram();
-
-						sync_and_reset();
-
-						for(;;)
-						{
-
-						}					
-					}
-					else
-					{
-						logger->log(LOG_LEVEL::info, "Bootloader_task", "App load failed, staying in bootloader mode");
-					}
+					logger->log(LOG_LEVEL::info, "Bootloader_task", "App load failed, staying in bootloader mode");
 				}
 			}
 			break;
@@ -567,140 +540,7 @@ void Bootloader_task::work()
 	}
 }
 
-bool Bootloader_task::load_verify_hex_app_image()
-{
-	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
-
-	const char* fname = "app.hex";
-	LFS_file file(&m_fs);
-	int ret = file.open(fname, LFS_O_RDONLY);
-	if(ret < 0)
-	{
-		logger->log(LOG_LEVEL::error, "Bootloader_task", "Opening file %s failed: %" PRId32, fname, ret);
-		return false;
-	}
-
-	mbedtls_md5_context md5_ctx;
-	mbedtls_md5_init(&md5_ctx);
-
-	mbedtls_md5_starts_ret(&md5_ctx);
-
-	//stream buffer for line extraction
-	std::vector<char> file_buffer;
-	file_buffer.reserve(1024);
-
-	Stack_string<128> line_buffer;
-	// line_buffer.reserve(64);
-
-	//256 byte read buffer
-	std::vector<char> read_buffer;
-	read_buffer.resize(256);
-
-	Intel_hex_loader hex_loader;
-
-	lfs_ssize_t read_ret = 0;
-	do
-	{
-		read_ret = lfs_file_read(m_fs.get_fs(), file.get_fd(), read_buffer.data(), read_buffer.size());
-		if(read_ret < 0)
-		{
-			logger->log(LOG_LEVEL::error, "Bootloader_task", "Error loading app file");
-			return false;
-		}
-
-		mbedtls_md5_update_ret(&md5_ctx, (unsigned char*) read_buffer.data(), read_ret);
-
-		file_buffer.insert(file_buffer.end(), read_buffer.begin(), std::next(read_buffer.begin(), read_ret));
-
-		std::vector<char>::iterator line_it;
-		do
-		{
-			line_it = std::find(file_buffer.begin(), file_buffer.end(), '\n');
-			if(line_it == file_buffer.end())
-			{
-				break;
-			}
-
-			//copy the line
-			auto line_next_it = std::next(line_it);
-			line_buffer.assign(file_buffer.begin(), line_next_it);
-			file_buffer.erase(file_buffer.begin(), line_next_it);
-
-			if(!hex_loader.process_line(line_buffer.data(), line_buffer.size()))
-			{
-				logger->log(LOG_LEVEL::error, "Bootloader_task", "hex_loader.process_line failed: %s", line_buffer.c_str());
-				break;
-			}
-
-		} while(line_it != file_buffer.end());
-	} while(read_ret > 0);
-	
-	int close_ret = file.close();
-	if(close_ret != LFS_ERR_OK)
-	{
-		logger->log(LOG_LEVEL::error, "Bootloader_task", "close file %s failed: %" PRId32, fname, close_ret);
-	}
-
-	logger->log(LOG_LEVEL::info, "Bootloader_task", "File loaded");
-
-	std::array<unsigned char, 16> md5_output;
-	mbedtls_md5_finish_ret(&md5_ctx, md5_output.data() );
-	mbedtls_md5_free(&md5_ctx);
-
-	std::array<char, 33> md5_output_hex;
-	md5_output_hex.back() = '\0';
-	for(size_t i = 0; i < 16; i++)
-	{
-		Byte_util::u8_to_hex(md5_output[i], md5_output_hex.data() + 2*i);
-	}
-	logger->log(LOG_LEVEL::debug, "Bootloader_task", "File checksum: %s", md5_output_hex.data());
-
-	{
-		LFS_file md5_file(&m_fs);
-		ret = md5_file.open("app.hex.md5", LFS_O_RDONLY);
-		if(ret < 0)
-		{
-			logger->log(LOG_LEVEL::error, "Bootloader_task", "Error loading app file checksum");
-			return false;
-		}
-
-		std::array<unsigned char, 16> md5_input;
-		read_ret = lfs_file_read(m_fs.get_fs(), md5_file.get_fd(), md5_input.data(), md5_input.size());
-		if(read_ret != md5_input.size())
-		{
-			logger->log(LOG_LEVEL::error, "Bootloader_task", "Error loading app file checksum");
-			return false;
-		}
-
-		md5_file.close();
-
-		if( ! std::equal(md5_output.begin(), md5_output.end(), md5_input.begin()) )
-		{
-			logger->log(LOG_LEVEL::error, "Bootloader_task", "File checksum match fail");
-			return false;
-		}
-		logger->log(LOG_LEVEL::debug, "Bootloader_task", "File checksum match ok");
-	}
-
-	if(hex_loader.has_eof())
-	{
-		uint32_t boot_addr = 0;
-		if(!hex_loader.get_boot_addr(&boot_addr))
-		{
-			logger->log(LOG_LEVEL::error, "Bootloader_task", "Got EOF, but no boot addr");
-			return false;
-		}
-	}
-	else
-	{
-		logger->log(LOG_LEVEL::error, "Bootloader_task", "No EOF in boot record");
-		return false;
-	}
-
-	return true;
-}
-
-bool Bootloader_task::load_verify_bin_app_image()
+bool Bootloader_task::load_verify_bin_app_image(Bootloader_key* const key)
 {
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 
@@ -762,6 +602,7 @@ bool Bootloader_task::load_verify_bin_app_image()
 	}
 	logger->log(LOG_LEVEL::debug, "Bootloader_task", "File checksum: %s", md5_output_hex.data());
 
+	std::array<unsigned char, 16> md5_input;
 	{
 		LFS_file md5_file(&m_fs);
 		ret = md5_file.open("app.bin.md5", LFS_O_RDONLY);
@@ -771,7 +612,6 @@ bool Bootloader_task::load_verify_bin_app_image()
 			return false;
 		}
 
-		std::array<unsigned char, 16> md5_input;
 		read_ret = lfs_file_read(m_fs.get_fs(), md5_file.get_fd(), md5_input.data(), md5_input.size());
 		if(read_ret != md5_input.size())
 		{
@@ -789,6 +629,8 @@ bool Bootloader_task::load_verify_bin_app_image()
 
 		logger->log(LOG_LEVEL::debug, "Bootloader_task", "File checksum match ok");
 	}
+
+	*key = set_bootloader_key(Bootloader_key::Bootloader_ops::RUN_APP, md5_input, num_written);
 
 	return true;
 }
@@ -977,22 +819,60 @@ void Bootloader_task::zero_axi_sram()
 	__DSB();
 }
 
-void Bootloader_task::ecc_scrub_axi_sram()
+void Bootloader_task::ecc_flush_axi_sram(const uint32_t length)
 {
-	__DSB();
+	const size_t length_in_words = length / 8UL;
 
+	asm volatile(
+		"cpsid i\n"
+		"isb sy\n"
+		"dsb sy\n"
+		: /* no out */
+		: /* no in */
+		: "memory"
+	);
+
+	SCB_CleanDCache();
+	SCB_DisableDCache();
+
+	uint64_t tmp;
 	uint64_t volatile* axi_base = reinterpret_cast<uint64_t volatile*>(m_mem_base);
-	for(size_t i = 0; i < (512*1024/8); i++)
-	{
-		uint64_t tmp = axi_base[i];
-		axi_base[i] = tmp;
-	}
+	tmp = axi_base[length_in_words];
+	axi_base[length_in_words] = tmp;
 
-	__DSB();
+	SCB_EnableDCache();
+
+	asm volatile(
+		"cpsie i\n"
+		"isb sy\n"
+		"dsb sy\n"
+		: /* no out */
+		: /* no in */
+		: "memory"
+	);
 }
-void Bootloader_task::ecc_scrub_bbram()
+void Bootloader_task::ecc_flush_bbram(const uint32_t length)
 {
+	const size_t length_in_words = length / 4UL;
+
+	asm volatile(
+		"cpsid i\n"
+		"isb sy\n"
+		"dsb sy\n"
+		: /* no out */
+		: /* no in */
+		: "memory"
+	);
+
+	SCB_CleanDCache();
+	SCB_DisableDCache();
+
 	HAL_PWR_EnableBkUpAccess();
+
+	uint32_t tmp;
+	uint32_t volatile* bbram_base = reinterpret_cast<uint32_t volatile*>(0x38800000);
+	tmp = bbram_base[length_in_words];
+	bbram_base[length_in_words] = tmp;
 
 	asm volatile(
 		"isb sy\n"
@@ -1001,19 +881,13 @@ void Bootloader_task::ecc_scrub_bbram()
 		: /* no in */
 		: "memory"
 	);
-
-	uint32_t volatile* bbram_base = reinterpret_cast<uint32_t volatile*>(0x38800000);
-	for(size_t i = 0; i < (4*1024/4); i++)
-	{
-		uint32_t tmp = bbram_base[i];
-		bbram_base[i] = tmp;
-	}
-
-	__DSB();
 
 	HAL_PWR_DisableBkUpAccess();
 
+	SCB_EnableDCache();
+
 	asm volatile(
+		"cpsie i\n"
 		"isb sy\n"
 		"dsb sy\n"
 		: /* no out */
@@ -1022,7 +896,7 @@ void Bootloader_task::ecc_scrub_bbram()
 	);
 }
 
-std::array<uint8_t, 16> Bootloader_task::calculate_md5_axi_sram()
+std::array<uint8_t, 16> Bootloader_task::calculate_md5_axi_sram(const uint32_t length)
 {
 	uint8_t* const axi_base = reinterpret_cast<uint8_t*>(m_mem_base);
 
@@ -1031,7 +905,7 @@ std::array<uint8_t, 16> Bootloader_task::calculate_md5_axi_sram()
 	mbedtls_md5_context md5_ctx;
 	mbedtls_md5_init(&md5_ctx);
 	mbedtls_md5_starts_ret(&md5_ctx);
-	mbedtls_md5_update_ret(&md5_ctx, axi_base, m_mem_size);
+	mbedtls_md5_update_ret(&md5_ctx, axi_base, std::min<size_t>(length, m_mem_size));
 	mbedtls_md5_finish_ret(&md5_ctx, md5_output.data());
 	mbedtls_md5_free(&md5_ctx);
 
@@ -1275,7 +1149,7 @@ void Bootloader_task::sync_and_reset()
 		: /* no out */
 		: /* no in */
 		: "memory"
-		);
+	);
 
 	SCB_DisableDCache();
 	SCB_DisableICache();

@@ -104,43 +104,14 @@ public:
 		//BBRAM, 0x38800000, 4K
 		Bootloader_key key(op);
 		
-		HAL_PWR_EnableBkUpAccess();
-		
 		asm volatile(
+			"cpsid i\n"
 			"isb sy\n"
 			"dsb sy\n"
 			: /* no out */
 			: /* no in */
 			: "memory"
 		);
-
-		key.to_addr(reinterpret_cast<uint8_t*>(0x38800000));  
-
-		asm volatile(
-			"isb sy\n"
-			"dsb sy\n"
-			: /* no out */
-			: /* no in */
-			: "memory"
-		);
-
-		HAL_PWR_DisableBkUpAccess();
-
-		asm volatile(
-			"isb sy\n"
-			"dsb sy\n"
-			: /* no out */
-			: /* no in */
-			: "memory"
-		);
-
-		return key;
-	}
-
-	static Bootloader_key set_bootloader_key(const Bootloader_key::Bootloader_ops op, const std::array<uint8_t, 16>& app_md5)
-	{
-		//BBRAM, 0x38800000, 4K
-		Bootloader_key key(op, app_md5);
 
 		HAL_PWR_EnableBkUpAccess();
 
@@ -165,6 +136,55 @@ public:
 		HAL_PWR_DisableBkUpAccess();
 
 		asm volatile(
+			"cpsie i\n"
+			"isb sy\n"
+			"dsb sy\n"
+			: /* no out */
+			: /* no in */
+			: "memory"
+		);
+
+		return key;
+	}
+
+	static Bootloader_key set_bootloader_key(const Bootloader_key::Bootloader_ops op, const std::array<uint8_t, 16>& app_md5, const uint32_t length)
+	{
+		//BBRAM, 0x38800000, 4K
+		Bootloader_key key(op, app_md5, length);
+
+		asm volatile(
+			"cpsid i\n"
+			"isb sy\n"
+			"dsb sy\n"
+			: /* no out */
+			: /* no in */
+			: "memory"
+		);
+
+		HAL_PWR_EnableBkUpAccess();
+
+		asm volatile(
+			"isb sy\n"
+			"dsb sy\n"
+			: /* no out */
+			: /* no in */
+			: "memory"
+		);
+
+		key.to_addr(reinterpret_cast<uint8_t*>(0x38800000));
+
+		asm volatile(
+			"isb sy\n"
+			"dsb sy\n"
+			: /* no out */
+			: /* no in */
+			: "memory"
+		);
+
+		HAL_PWR_DisableBkUpAccess();
+
+		asm volatile(
+			"cpsie i\n"
 			"isb sy\n"
 			"dsb sy\n"
 			: /* no out */
@@ -190,17 +210,16 @@ public:
 
 	static void zero_axi_sram();
 
-	static void ecc_scrub_axi_sram();
-	static void ecc_scrub_bbram();
+	static void ecc_flush_axi_sram(const uint32_t length_bytes);
+	static void ecc_flush_bbram(const uint32_t length_bytes);
 
-	static std::array<uint8_t, 16> calculate_md5_axi_sram();
+	static std::array<uint8_t, 16> calculate_md5_axi_sram(const uint32_t length);
 
 protected:
 
 	bool init_usb();
 
-	bool load_verify_hex_app_image();
-	bool load_verify_bin_app_image();
+	bool load_verify_bin_app_image(Bootloader_key* const key);
 	bool load_verify_bin_gcm_app_image();
 
 	void sync_and_reset();
@@ -213,8 +232,8 @@ protected:
 	mbedtls_md5_context m_fd_md5_ctx;
 
 	static uint8_t* const m_mem_base;
-	static const size_t m_mem_size            = 512*1024;
-	static const size_t m_download_block_size = CFG_TUD_DFU_XFER_BUFSIZE;
+	static constexpr size_t m_mem_size            = 512*1024;
+	static constexpr size_t m_download_block_size = CFG_TUD_DFU_XFER_BUFSIZE;
 
 	bool check_option_bytes();
 	bool config_option_bytes();
