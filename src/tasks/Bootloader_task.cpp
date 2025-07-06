@@ -253,23 +253,13 @@ uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_n
 }
 void Bootloader_task::handle_tud_dfu_detach_cb(void)
 {
-	Bootloader_key boot_key;
-	boot_key.from_addr(reinterpret_cast<const uint8_t*>(0x38800000));
-
-	boot_key.bootloader_op = uint8_t(Bootloader_key::Bootloader_ops::RUN_APP);
-	boot_key.update_crc();
-	boot_key.to_addr(reinterpret_cast<uint8_t volatile *>(0x38800000));
+	set_bootloader_key(Bootloader_key::Bootloader_ops::LOAD_APP);
 
 	sync_and_reset();
 }
 void Bootloader_task::handle_tud_dfu_abort_cb(uint8_t alt)
 {
-	Bootloader_key boot_key;
-	boot_key.from_addr(reinterpret_cast<const uint8_t*>(0x38800000));
-	
-	boot_key.bootloader_op = uint8_t(Bootloader_key::Bootloader_ops::RUN_APP);
-	boot_key.update_crc();
-	boot_key.to_addr(reinterpret_cast<uint8_t volatile *>(0x38800000));
+	set_bootloader_key(Bootloader_key::Bootloader_ops::LOAD_APP);
 
 	sync_and_reset();
 }
@@ -373,6 +363,11 @@ void Bootloader_task::work()
 				logger->log(LOG_LEVEL::info, "Bootloader_task", "Key: RUN_BOOTLDR");
 				break;
 			}
+			case uint8_t(Bootloader_key::Bootloader_ops::LOAD_APP):
+			{
+				logger->log(LOG_LEVEL::info, "Bootloader_task", "Key: LOAD_APP");
+				break;
+			}
 			case uint8_t(Bootloader_key::Bootloader_ops::RUN_APP):
 			{
 				logger->log(LOG_LEVEL::info, "Bootloader_task", "Key: RUN_APP");
@@ -463,13 +458,17 @@ void Bootloader_task::work()
 			logger->log(LOG_LEVEL::info, "Bootloader_task", "Bootloader requested");
 			break;
 		}
-		case uint8_t(Bootloader_key::Bootloader_ops::RUN_APP):
+		case uint8_t(Bootloader_key::Bootloader_ops::LOAD_APP):
 		{
 			logger->log(LOG_LEVEL::info, "Bootloader_task", "App load requested");
 
 			logger->log(LOG_LEVEL::info, "Bootloader_task", "Looking for bin gcm file");
 			if(load_verify_bin_gcm_app_image())
 			{
+				logger->log(LOG_LEVEL::info, "Bootloader_task", "App load complete, resetting");
+				set_bootloader_key(Bootloader_key::Bootloader_ops::RUN_APP);
+				sync_and_reset();
+
 				for(;;)
 				{
 
@@ -480,6 +479,10 @@ void Bootloader_task::work()
 				logger->log(LOG_LEVEL::info, "Bootloader_task", "Looking for hex file");
 				if(load_verify_hex_app_image())
 				{
+					logger->log(LOG_LEVEL::info, "Bootloader_task", "App load complete, resetting");
+					set_bootloader_key(Bootloader_key::Bootloader_ops::RUN_APP);
+					sync_and_reset();
+
 					for(;;)
 					{
 
@@ -490,6 +493,10 @@ void Bootloader_task::work()
 					logger->log(LOG_LEVEL::info, "Bootloader_task", "Looking for bin file");
 					if(load_verify_bin_app_image())
 					{
+						logger->log(LOG_LEVEL::info, "Bootloader_task", "App load complete, resetting");
+						set_bootloader_key(Bootloader_key::Bootloader_ops::RUN_APP);
+						sync_and_reset();
+
 						for(;;)
 						{
 
@@ -501,12 +508,19 @@ void Bootloader_task::work()
 					}
 				}
 			}
-
+			break;
+		}
+		case uint8_t(Bootloader_key::Bootloader_ops::RUN_APP):
+		{
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "App run requested, but we got to the main Bootloader task for some reason");
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "The app should have been jumped to close to the start of main");
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "Restarting");
+			sync_and_reset();
 			break;
 		}
 		default:
 		{
-			logger->log(LOG_LEVEL::info, "Bootloader_task", "Invalid boot key");
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "Invalid boot key, staying in bootloader mode");
 			break;
 		}
 	}
@@ -644,17 +658,6 @@ bool Bootloader_task::load_verify_hex_app_image()
 			logger->log(LOG_LEVEL::error, "Bootloader_task", "Got EOF, but no boot addr");
 			return false;
 		}
-
-		logger->log(LOG_LEVEL::debug, "Bootloader_task", "Got EOF, boot addr: 0x%08" PRIX32 ", estack: %08" PRIX32, boot_addr, 0);
-		logger->log(LOG_LEVEL::info, "Bootloader_task", "Jumping to application...");
-
-		jump_to_addr(0, boot_addr);
-
-		//we should never reach here
-		for(;;)
-		{
-
-		}
 	}
 	else
 	{
@@ -752,23 +755,6 @@ bool Bootloader_task::load_verify_bin_app_image()
 			return false;
 		}
 		logger->log(LOG_LEVEL::debug, "Bootloader_task", "File checksum match ok");
-	}
-
-	uint32_t app_estack = 0;
-	uint32_t app_reset_handler = 0;
-
-	std::copy_n(axi_base, sizeof(app_estack), reinterpret_cast<uint8_t*>(&app_estack));
-	std::copy_n(axi_base + sizeof(app_estack), sizeof(app_reset_handler), reinterpret_cast<uint8_t*>(&app_reset_handler));
-
-	logger->log(LOG_LEVEL::debug, "Bootloader_task", "Got EOF, boot addr: 0x%08" PRIX32 ", estack: %08" PRIX32, app_reset_handler, app_estack);
-	logger->log(LOG_LEVEL::info, "Bootloader_task", "Jumping to application...");
-
-	jump_to_addr(app_estack, app_reset_handler);
-
-	//we should never reach here
-	for(;;)
-	{
-
 	}
 
 	return true;
@@ -902,26 +888,7 @@ bool Bootloader_task::load_verify_bin_gcm_app_image()
 
 	logger->log(LOG_LEVEL::info, "Bootloader_task", "File loaded");
 
-	{
-		uint32_t app_estack = 0;
-		uint32_t app_reset_handler = 0;
-
-		std::copy_n(axi_base, sizeof(app_estack), reinterpret_cast<uint8_t*>(&app_estack));
-		std::copy_n(axi_base + sizeof(app_estack), sizeof(app_reset_handler), reinterpret_cast<uint8_t*>(&app_reset_handler));
-
-		logger->log(LOG_LEVEL::debug, "Bootloader_task", "Got EOF, boot addr: 0x%08" PRIX32 ", estack: %08" PRIX32, app_reset_handler, app_estack);
-		logger->log(LOG_LEVEL::info, "Bootloader_task", "Jumping to application...");
-
-		jump_to_addr(app_estack, app_reset_handler);
-	}
-
-	//we should never reach here
-	for(;;)
-	{
-
-	}
-
-	return false;
+	return true;
 }
 
 void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
@@ -939,124 +906,6 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 	//Disable Cache
 	SCB_DisableDCache();
 	SCB_DisableICache();
-
-	//Invalidate Cache
-	// SCB_InvalidateDCache();
-	// SCB_InvalidateICache();
-
-	//Sync
-	asm volatile(
-		"isb sy\n"
-		"dsb sy\n"
-		: /* no out */
-		: /* no in */
-		: "memory"
-		);
-
-	//http://www.keil.com/support/docs/3913.htm
-
-	NVIC->ICER[ 0 ] = 0xFFFFFFFF;
-	NVIC->ICER[ 1 ] = 0xFFFFFFFF;
-	NVIC->ICER[ 2 ] = 0xFFFFFFFF;
-	NVIC->ICER[ 3 ] = 0xFFFFFFFF;
-	NVIC->ICER[ 4 ] = 0xFFFFFFFF;
-	NVIC->ICER[ 5 ] = 0xFFFFFFFF;
-	NVIC->ICER[ 6 ] = 0xFFFFFFFF;
-	NVIC->ICER[ 7 ] = 0xFFFFFFFF;
-
-	// This has to be done early, as it will turn TIM17 back on if it is off
-	HAL_RCC_DeInit();
-
-	//disable and reset peripherals
-	// TODO: TIM17 is not resetting???
-	// It seems to reset from a call to __HAL_RCC_APB2_FORCE_RESET if done application side
-	// TODO: verify if __HAL_RCC_APB2_FORCE_RESET is working, or if we are taking some odd code path
-
-	__HAL_RCC_AHB1_FORCE_RESET();
-	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
-	__HAL_RCC_AHB1_RELEASE_RESET();
-
-	__HAL_RCC_AHB2_FORCE_RESET();
-	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
-	__HAL_RCC_AHB2_RELEASE_RESET();
-
-	//we can't bulk reset AHB3 because that resets the cpu and fmc
-	// __HAL_RCC_AHB3_FORCE_RESET();
-	// __HAL_RCC_AHB3_RELEASE_RESET();
-	__HAL_RCC_MDMA_FORCE_RESET();
-	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
-	__HAL_RCC_MDMA_RELEASE_RESET();
-
-	__HAL_RCC_DMA2D_FORCE_RESET();
-	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
-	__HAL_RCC_DMA2D_RELEASE_RESET();
-
-	__HAL_RCC_JPGDECRST_FORCE_RESET();
-	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
-	__HAL_RCC_JPGDECRST_RELEASE_RESET();
-	// __HAL_RCC_FMC_FORCE_RESET();
-	// __HAL_RCC_FMC_RELEASE_RESET();
-	__HAL_RCC_QSPI_FORCE_RESET();
-	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
-	__HAL_RCC_QSPI_RELEASE_RESET();
-
-	__HAL_RCC_SDMMC1_FORCE_RESET();
-	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
-	__HAL_RCC_SDMMC1_RELEASE_RESET();
-	// __HAL_RCC_CPU_FORCE_RESET();
-	// __HAL_RCC_CPU_RELEASE_RESET();
-
-	__HAL_RCC_AHB4_FORCE_RESET();
-	asm volatile("dsb 0xF\n" : /* no out */	: /* no in */ : "memory");
-	__HAL_RCC_AHB4_RELEASE_RESET();
-
-	__HAL_RCC_APB1L_FORCE_RESET();
-	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
-	__HAL_RCC_APB1L_RELEASE_RESET();
-
-	__HAL_RCC_APB1H_FORCE_RESET();
-	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
-	__HAL_RCC_APB1H_RELEASE_RESET();
-
-	__HAL_RCC_APB2_FORCE_RESET();
-	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
-	__HAL_RCC_APB2_RELEASE_RESET();
-
-	__HAL_RCC_APB3_FORCE_RESET();
-	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
-	__HAL_RCC_APB3_RELEASE_RESET();
-
-	__HAL_RCC_APB4_FORCE_RESET();
-	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
-	__HAL_RCC_APB4_RELEASE_RESET();
-
-	//Sync
-	asm volatile(
-		"isb sy\n"
-		"dsb sy\n"
-		: /* no out */
-		: /* no in */
-		: "memory"
-		);
-
-	NVIC->ICPR[ 0 ] = 0xFFFFFFFF;
-	NVIC->ICPR[ 1 ] = 0xFFFFFFFF;
-	NVIC->ICPR[ 2 ] = 0xFFFFFFFF;
-	NVIC->ICPR[ 3 ] = 0xFFFFFFFF;
-	NVIC->ICPR[ 4 ] = 0xFFFFFFFF;
-	NVIC->ICPR[ 5 ] = 0xFFFFFFFF;
-	NVIC->ICPR[ 6 ] = 0xFFFFFFFF;
-	NVIC->ICPR[ 7 ] = 0xFFFFFFFF;
-
-	SysTick->CTRL = 0;
-	SCB->ICSR |= SCB_ICSR_PENDSTCLR_Msk;
-	SysTick->LOAD = 0;
-	SysTick->VAL = 0;
-
-	//TODO - scrub ram?
-
-	//Disable MPU
-	HAL_MPU_Disable();
 
 	//Sync
 	asm volatile(

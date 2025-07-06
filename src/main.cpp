@@ -180,6 +180,44 @@ int main(void)
 		#endif
 	}
 
+	// Check boot key early
+	{
+		Bootloader_key boot_key;
+		boot_key.from_addr(reinterpret_cast<const uint8_t*>(0x38800000));
+
+		if(boot_key.verify())
+		{
+			switch(boot_key.bootloader_op)
+			{
+				case uint8_t(Bootloader_key::Bootloader_ops::RUN_BOOTLDR):
+				{
+					break;
+				}
+				case uint8_t(Bootloader_key::Bootloader_ops::LOAD_APP):
+				{
+					break;
+				}
+				case uint8_t(Bootloader_key::Bootloader_ops::RUN_APP):
+				{
+					uint32_t app_estack = 0;
+					uint32_t app_reset_handler = 0;
+
+					volatile uint8_t* const axi_base = reinterpret_cast<volatile uint8_t*>(0x24000000);
+					std::copy_n(axi_base, sizeof(app_estack), reinterpret_cast<uint8_t*>(&app_estack));
+					std::copy_n(axi_base + sizeof(app_estack), sizeof(app_reset_handler), reinterpret_cast<uint8_t*>(&app_reset_handler));
+
+					Bootloader_task::jump_to_addr(app_estack, app_reset_handler);
+
+					break;
+				}
+				default:
+				{
+					break;
+				}
+			}
+		}
+	}
+
 	//confg mpu
 	if(1)
 	{
@@ -451,8 +489,6 @@ int main(void)
 	MX_GPIO_Init();
 	MX_USART1_UART_Init();
 	MX_RNG_Init();
-	// MX_TIM3_Init();
-	// MX_QUADSPI_Init();
 
 	if(0)
 	{

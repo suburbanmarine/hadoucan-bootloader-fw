@@ -96,7 +96,7 @@ public:
 
 	Bootloader_key clear_bootloader_key()
 	{
-		return set_bootloader_key(Bootloader_key::Bootloader_ops::RUN_APP);
+		return set_bootloader_key(Bootloader_key::Bootloader_ops::LOAD_APP);
 	} 
 	
 	Bootloader_key set_bootloader_key(const Bootloader_key::Bootloader_ops op)
@@ -117,7 +117,7 @@ public:
 			);
 
 		return key;
-	} 
+	}
 	
 	static void get_unique_id(std::array<uint32_t, 3>* const id);
 	static void get_unique_id_str(std::array<char, 25>* const id_str);
