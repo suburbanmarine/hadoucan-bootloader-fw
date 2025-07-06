@@ -102,20 +102,37 @@ public:
 	static Bootloader_key set_bootloader_key(const Bootloader_key::Bootloader_ops op)
 	{
 		//BBRAM, 0x38800000, 4K
-		Bootloader_key key;
-		key.update_magic_sig();
-		key.app_md5.fill(0);
-		key.bootloader_op = static_cast<uint8_t>(op);
-		key.update_crc();
-
-		key.to_addr(reinterpret_cast<uint8_t*>(0x38800000));
+		Bootloader_key key(op);
+		
+		HAL_PWR_EnableBkUpAccess();
+		
 		asm volatile(
-			"dsb 0xF\n"
-			"isb 0xF\n"
+			"isb sy\n"
+			"dsb sy\n"
 			: /* no out */
 			: /* no in */
 			: "memory"
-			);
+		);
+
+		key.to_addr(reinterpret_cast<uint8_t*>(0x38800000));  
+
+		asm volatile(
+			"isb sy\n"
+			"dsb sy\n"
+			: /* no out */
+			: /* no in */
+			: "memory"
+		);
+
+		HAL_PWR_DisableBkUpAccess();
+
+		asm volatile(
+			"isb sy\n"
+			"dsb sy\n"
+			: /* no out */
+			: /* no in */
+			: "memory"
+		);
 
 		return key;
 	}
@@ -123,20 +140,37 @@ public:
 	static Bootloader_key set_bootloader_key(const Bootloader_key::Bootloader_ops op, const std::array<uint8_t, 16>& app_md5)
 	{
 		//BBRAM, 0x38800000, 4K
-		Bootloader_key key;
-		key.update_magic_sig();
-		key.app_md5 = app_md5;
-		key.bootloader_op = static_cast<uint8_t>(op);
-		key.update_crc();
+		Bootloader_key key(op, app_md5);
 
-		key.to_addr(reinterpret_cast<uint8_t*>(0x38800000));
+		HAL_PWR_EnableBkUpAccess();
+
 		asm volatile(
-			"dsb 0xF\n"
-			"isb 0xF\n"
+			"isb sy\n"
+			"dsb sy\n"
 			: /* no out */
 			: /* no in */
 			: "memory"
-			);
+		);
+
+		key.to_addr(reinterpret_cast<uint8_t*>(0x38800000));
+
+		asm volatile(
+			"isb sy\n"
+			"dsb sy\n"
+			: /* no out */
+			: /* no in */
+			: "memory"
+		);
+
+		HAL_PWR_DisableBkUpAccess();
+
+		asm volatile(
+			"isb sy\n"
+			"dsb sy\n"
+			: /* no out */
+			: /* no in */
+			: "memory"
+		);
 
 		return key;
 	}
@@ -155,6 +189,9 @@ public:
 	static void jump_to_addr(uint32_t estack, uint32_t jump_addr) __attribute__((noreturn));
 
 	static void zero_axi_sram();
+
+	static void ecc_scrub_axi_sram();
+	static void ecc_scrub_bbram();
 
 	static std::array<uint8_t, 16> calculate_md5_axi_sram();
 
@@ -175,7 +212,7 @@ protected:
 	std::shared_ptr<LFS_file> m_fd;
 	mbedtls_md5_context m_fd_md5_ctx;
 
-	uint8_t* const m_mem_base                 = reinterpret_cast<uint8_t*>(0x24000000);
+	static uint8_t* const m_mem_base;
 	static const size_t m_mem_size            = 512*1024;
 	static const size_t m_download_block_size = CFG_TUD_DFU_XFER_BUFSIZE;
 

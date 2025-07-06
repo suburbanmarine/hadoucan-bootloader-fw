@@ -27,6 +27,8 @@
 
 using freertos_util::logging::LOG_LEVEL;
 
+uint8_t* const Bootloader_task::m_mem_base = reinterpret_cast<uint8_t*>(0x24000000);
+
 uint32_t Bootloader_task::handle_tud_dfu_get_timeout_cb(uint8_t alt, uint8_t state)
 {
 	uint32_t bwPollTimeout_ms = 0;
@@ -344,7 +346,7 @@ void Bootloader_task::work()
 	Bootloader_key boot_key;
 	{
 		logger->log(LOG_LEVEL::info, "Bootloader_task", "Reading Boot Key");
-		boot_key.from_addr(reinterpret_cast<const uint8_t*>(0x38800000));
+		boot_key.from_addr(reinterpret_cast<uint8_t const *>(0x38800000));
 
 		if(!boot_key.verify())
 		{
@@ -461,7 +463,7 @@ void Bootloader_task::work()
 		case uint8_t(Bootloader_key::Bootloader_ops::LOAD_APP):
 		{
 			logger->log(LOG_LEVEL::info, "Bootloader_task", "App load requested, clearing axi sram");
-			// zero_axi_sram();
+			zero_axi_sram();
 
 			/*
 			logger->log(LOG_LEVEL::info, "Bootloader_task", "Looking for bin gcm file");
@@ -470,6 +472,14 @@ void Bootloader_task::work()
 				logger->log(LOG_LEVEL::info, "Bootloader_task", "App load complete, resetting");
 				std::array<uint8_t, 16> md5_axi = calculate_md5_axi_sram();
 				set_bootloader_key(Bootloader_key::Bootloader_ops::RUN_APP, md5_axi);
+
+				// See 2.4 Embedded SRAM note Error code correction
+				// Write are delayed in the event of a less than ecc sized write
+				// Scrub SRAM areas needed to be preserved before resetting
+				SCB_CleanDCache();
+				ecc_scrub_axi_sram();
+				ecc_scrub_bbram();
+				
 				sync_and_reset();
 
 				for(;;)
@@ -486,6 +496,13 @@ void Bootloader_task::work()
 					logger->log(LOG_LEVEL::info, "Bootloader_task", "App load complete, resetting");
 					std::array<uint8_t, 16> md5_axi = calculate_md5_axi_sram();
 					set_bootloader_key(Bootloader_key::Bootloader_ops::RUN_APP, md5_axi);
+					// See 2.4 Embedded SRAM note Error code correction
+					// Write are delayed in the event of a less than ecc sized write
+					// Scrub SRAM areas needed to be preserved before resetting
+					SCB_CleanDCache();
+					ecc_scrub_axi_sram();
+					ecc_scrub_bbram();
+
 					sync_and_reset();
 
 					for(;;)
@@ -501,6 +518,15 @@ void Bootloader_task::work()
 						logger->log(LOG_LEVEL::info, "Bootloader_task", "App load complete, resetting");
 						std::array<uint8_t, 16> md5_axi = calculate_md5_axi_sram();
 						set_bootloader_key(Bootloader_key::Bootloader_ops::RUN_APP, md5_axi);
+
+						// See 2.4 Embedded SRAM note Error code correction
+						// Write are delayed in the event of a less than ecc sized write
+						// Scrub SRAM areas needed to be preserved before resetting
+						SCB_CleanDCache();
+						SCB_DisableDCache();
+						ecc_scrub_axi_sram();
+						ecc_scrub_bbram();
+
 						sync_and_reset();
 
 						for(;;)
@@ -944,16 +970,61 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 
 void Bootloader_task::zero_axi_sram()
 {
-	uint64_t volatile* const axi_base = reinterpret_cast<uint64_t volatile*>(0x24000000UL);
+	uint64_t volatile* const axi_base = reinterpret_cast<uint64_t volatile*>(m_mem_base);
 
 	std::fill_n(axi_base, m_mem_size / 8, 0);
 
 	__DSB();
 }
 
+void Bootloader_task::ecc_scrub_axi_sram()
+{
+	__DSB();
+
+	uint64_t volatile* axi_base = reinterpret_cast<uint64_t volatile*>(m_mem_base);
+	for(size_t i = 0; i < (512*1024/8); i++)
+	{
+		uint64_t tmp = axi_base[i];
+		axi_base[i] = tmp;
+	}
+
+	__DSB();
+}
+void Bootloader_task::ecc_scrub_bbram()
+{
+	HAL_PWR_EnableBkUpAccess();
+
+	asm volatile(
+		"isb sy\n"
+		"dsb sy\n"
+		: /* no out */
+		: /* no in */
+		: "memory"
+	);
+
+	uint32_t volatile* bbram_base = reinterpret_cast<uint32_t volatile*>(0x38800000);
+	for(size_t i = 0; i < (4*1024/4); i++)
+	{
+		uint32_t tmp = bbram_base[i];
+		bbram_base[i] = tmp;
+	}
+
+	__DSB();
+
+	HAL_PWR_DisableBkUpAccess();
+
+	asm volatile(
+		"isb sy\n"
+		"dsb sy\n"
+		: /* no out */
+		: /* no in */
+		: "memory"
+	);
+}
+
 std::array<uint8_t, 16> Bootloader_task::calculate_md5_axi_sram()
 {
-	uint8_t* const axi_base = reinterpret_cast<uint8_t*>(0x24000000UL);
+	uint8_t* const axi_base = reinterpret_cast<uint8_t*>(m_mem_base);
 
 	std::array<uint8_t, 16> md5_output;
 	
@@ -1208,7 +1279,7 @@ void Bootloader_task::sync_and_reset()
 
 	SCB_DisableDCache();
 	SCB_DisableICache();
-	
+
 	NVIC_SystemReset();
 
 	for(;;)
