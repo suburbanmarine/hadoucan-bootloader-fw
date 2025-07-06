@@ -460,13 +460,16 @@ void Bootloader_task::work()
 		}
 		case uint8_t(Bootloader_key::Bootloader_ops::LOAD_APP):
 		{
-			logger->log(LOG_LEVEL::info, "Bootloader_task", "App load requested");
+			logger->log(LOG_LEVEL::info, "Bootloader_task", "App load requested, clearing axi sram");
+			// zero_axi_sram();
 
+			/*
 			logger->log(LOG_LEVEL::info, "Bootloader_task", "Looking for bin gcm file");
 			if(load_verify_bin_gcm_app_image())
 			{
 				logger->log(LOG_LEVEL::info, "Bootloader_task", "App load complete, resetting");
-				set_bootloader_key(Bootloader_key::Bootloader_ops::RUN_APP);
+				std::array<uint8_t, 16> md5_axi = calculate_md5_axi_sram();
+				set_bootloader_key(Bootloader_key::Bootloader_ops::RUN_APP, md5_axi);
 				sync_and_reset();
 
 				for(;;)
@@ -475,12 +478,14 @@ void Bootloader_task::work()
 				}
 			}
 			else
+			*/
 			{
 				logger->log(LOG_LEVEL::info, "Bootloader_task", "Looking for hex file");
 				if(load_verify_hex_app_image())
 				{
 					logger->log(LOG_LEVEL::info, "Bootloader_task", "App load complete, resetting");
-					set_bootloader_key(Bootloader_key::Bootloader_ops::RUN_APP);
+					std::array<uint8_t, 16> md5_axi = calculate_md5_axi_sram();
+					set_bootloader_key(Bootloader_key::Bootloader_ops::RUN_APP, md5_axi);
 					sync_and_reset();
 
 					for(;;)
@@ -494,7 +499,8 @@ void Bootloader_task::work()
 					if(load_verify_bin_app_image())
 					{
 						logger->log(LOG_LEVEL::info, "Bootloader_task", "App load complete, resetting");
-						set_bootloader_key(Bootloader_key::Bootloader_ops::RUN_APP);
+						std::array<uint8_t, 16> md5_axi = calculate_md5_axi_sram();
+						set_bootloader_key(Bootloader_key::Bootloader_ops::RUN_APP, md5_axi);
 						sync_and_reset();
 
 						for(;;)
@@ -754,6 +760,7 @@ bool Bootloader_task::load_verify_bin_app_image()
 			logger->log(LOG_LEVEL::error, "Bootloader_task", "File checksum match fail");
 			return false;
 		}
+
 		logger->log(LOG_LEVEL::debug, "Bootloader_task", "File checksum match ok");
 	}
 
@@ -935,6 +942,30 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 	}
 }
 
+void Bootloader_task::zero_axi_sram()
+{
+	uint64_t volatile* const axi_base = reinterpret_cast<uint64_t volatile*>(0x24000000UL);
+
+	std::fill_n(axi_base, m_mem_size / 8, 0);
+
+	__DSB();
+}
+
+std::array<uint8_t, 16> Bootloader_task::calculate_md5_axi_sram()
+{
+	uint8_t* const axi_base = reinterpret_cast<uint8_t*>(0x24000000UL);
+
+	std::array<uint8_t, 16> md5_output;
+	
+	mbedtls_md5_context md5_ctx;
+	mbedtls_md5_init(&md5_ctx);
+	mbedtls_md5_starts_ret(&md5_ctx);
+	mbedtls_md5_update_ret(&md5_ctx, axi_base, m_mem_size);
+	mbedtls_md5_finish_ret(&md5_ctx, md5_output.data());
+	mbedtls_md5_free(&md5_ctx);
+
+	return md5_output;
+}
 
 bool Bootloader_task::check_option_bytes()
 {

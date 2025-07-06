@@ -199,14 +199,26 @@ int main(void)
 				}
 				case uint8_t(Bootloader_key::Bootloader_ops::RUN_APP):
 				{
-					uint32_t app_estack = 0;
-					uint32_t app_reset_handler = 0;
+					// TODO: also check app checksum? Could store md5 in bbram and verify it before we jump
 
-					volatile uint8_t* const axi_base = reinterpret_cast<volatile uint8_t*>(0x24000000);
-					std::copy_n(axi_base, sizeof(app_estack), reinterpret_cast<uint8_t*>(&app_estack));
-					std::copy_n(axi_base + sizeof(app_estack), sizeof(app_reset_handler), reinterpret_cast<uint8_t*>(&app_reset_handler));
+					std::array<uint8_t, 16> md5_axi = Bootloader_task::calculate_md5_axi_sram();
 
-					Bootloader_task::jump_to_addr(app_estack, app_reset_handler);
+					if( std::equal(boot_key.app_md5.begin(), boot_key.app_md5.end(), md5_axi.begin()) )
+					{
+						uint32_t app_estack = 0;
+						uint32_t app_reset_handler = 0;
+
+						volatile uint8_t* const axi_base = reinterpret_cast<volatile uint8_t*>(0x24000000);
+						std::copy_n(axi_base, sizeof(app_estack), reinterpret_cast<uint8_t*>(&app_estack));
+						std::copy_n(axi_base + sizeof(app_estack), sizeof(app_reset_handler), reinterpret_cast<uint8_t*>(&app_reset_handler));
+
+						Bootloader_task::jump_to_addr(app_estack, app_reset_handler);
+					}
+					else
+					{
+						// Image is corrupt, reload
+						Bootloader_task::set_bootloader_key(Bootloader_key::Bootloader_ops::LOAD_APP);
+					}
 
 					break;
 				}
