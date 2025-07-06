@@ -964,11 +964,18 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 	NVIC->ICER[ 6 ] = 0xFFFFFFFF;
 	NVIC->ICER[ 7 ] = 0xFFFFFFFF;
 
+	// This has to be done early, as it will turn TIM17 back on if it is off
+	HAL_RCC_DeInit();
+
 	//disable and reset peripherals
+	// TODO: TIM17 is not resetting???
+	// It seems to reset from a call to __HAL_RCC_APB2_FORCE_RESET if done application side
+	// TODO: verify if __HAL_RCC_APB2_FORCE_RESET is working, or if we are taking some odd code path
+
 	__HAL_RCC_AHB1_FORCE_RESET();
 	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_AHB1_RELEASE_RESET();
-	
+
 	__HAL_RCC_AHB2_FORCE_RESET();
 	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_AHB2_RELEASE_RESET();
@@ -979,9 +986,11 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 	__HAL_RCC_MDMA_FORCE_RESET();
 	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_MDMA_RELEASE_RESET();
+
 	__HAL_RCC_DMA2D_FORCE_RESET();
 	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_DMA2D_RELEASE_RESET();
+
 	__HAL_RCC_JPGDECRST_FORCE_RESET();
 	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_JPGDECRST_RELEASE_RESET();
@@ -990,6 +999,7 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 	__HAL_RCC_QSPI_FORCE_RESET();
 	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_QSPI_RELEASE_RESET();
+
 	__HAL_RCC_SDMMC1_FORCE_RESET();
 	asm volatile("dsb sy\n" : /* no out */	: /* no in */ : "memory");
 	__HAL_RCC_SDMMC1_RELEASE_RESET();
@@ -1037,8 +1047,6 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 	NVIC->ICPR[ 5 ] = 0xFFFFFFFF;
 	NVIC->ICPR[ 6 ] = 0xFFFFFFFF;
 	NVIC->ICPR[ 7 ] = 0xFFFFFFFF;
-
-	HAL_RCC_DeInit();
 
 	SysTick->CTRL = 0;
 	SCB->ICSR |= SCB_ICSR_PENDSTCLR_Msk;
