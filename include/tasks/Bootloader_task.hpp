@@ -124,14 +124,7 @@ public:
 		);
 
 		key.to_addr(reinterpret_cast<uint8_t*>(0x38800000));
-
-		asm volatile(
-			"isb sy\n"
-			"dsb sy\n"
-			: /* no out */
-			: /* no in */
-			: "memory"
-		);
+		ecc_flush_bbram_noisr_noenable(Bootloader_key::LENGTH_IN_BYTES);
 
 		HAL_PWR_DisableBkUpAccess();
 
@@ -172,14 +165,7 @@ public:
 		);
 
 		key.to_addr(reinterpret_cast<uint8_t*>(0x38800000));
-
-		asm volatile(
-			"isb sy\n"
-			"dsb sy\n"
-			: /* no out */
-			: /* no in */
-			: "memory"
-		);
+		ecc_flush_bbram_noisr_noenable(Bootloader_key::LENGTH_IN_BYTES);
 
 		HAL_PWR_DisableBkUpAccess();
 
@@ -212,6 +198,7 @@ public:
 
 	static void ecc_flush_axi_sram(const uint32_t length_bytes);
 	static void ecc_flush_bbram(const uint32_t length_bytes);
+	static void ecc_flush_bbram_noisr_noenable(const uint32_t length_bytes);
 
 	static std::array<uint8_t, 16> calculate_md5_axi_sram(const uint32_t length);
 

@@ -856,6 +856,37 @@ void Bootloader_task::ecc_flush_axi_sram(const uint32_t length)
 		: "memory"
 	);
 }
+
+void Bootloader_task::ecc_flush_bbram_noisr_noenable(const uint32_t length)
+{
+	const size_t length_in_words = length / 4UL;
+
+	asm volatile(
+		"isb sy\n"
+		"dsb sy\n"
+		: /* no out */
+		: /* no in */
+		: "memory"
+	);
+
+	SCB_DisableDCache();
+
+	uint32_t tmp;
+	uint32_t volatile* bbram_base = reinterpret_cast<uint32_t volatile*>(0x38800000);
+	tmp = bbram_base[length_in_words];
+	bbram_base[length_in_words] = tmp;
+
+	asm volatile(
+		"isb sy\n"
+		"dsb sy\n"
+		: /* no out */
+		: /* no in */
+		: "memory"
+	);
+
+	SCB_EnableDCache();
+}
+
 void Bootloader_task::ecc_flush_bbram(const uint32_t length)
 {
 	const size_t length_in_words = length / 4UL;
