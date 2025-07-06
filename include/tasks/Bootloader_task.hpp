@@ -130,11 +130,11 @@ public:
 	void handle_tud_dfu_detach_cb(void);
 	void handle_tud_dfu_abort_cb(uint8_t alt);
 
+	static void jump_to_addr(uint32_t estack, uint32_t jump_addr) __attribute__((noreturn));
+
 protected:
 
 	bool init_usb();
-
-	void jump_to_addr(uint32_t estack, uint32_t jump_addr) __attribute__((noreturn));
 
 	bool load_verify_hex_app_image();
 	bool load_verify_bin_app_image();
