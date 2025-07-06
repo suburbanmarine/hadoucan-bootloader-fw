@@ -180,10 +180,15 @@ int main(void)
 		#endif
 	}
 
+	SCB_InvalidateDCache();
+	SCB_InvalidateICache();
+
 	// Check boot key early
 	{
 		Bootloader_key boot_key;
-		boot_key.from_addr(reinterpret_cast<const uint8_t*>(0x38800000));
+		boot_key.from_addr(reinterpret_cast<uint8_t const *>(0x38800000));
+
+		std::array<uint8_t, 16> md5_axi = Bootloader_task::calculate_md5_axi_sram();
 
 		if(boot_key.verify())
 		{
@@ -199,10 +204,6 @@ int main(void)
 				}
 				case uint8_t(Bootloader_key::Bootloader_ops::RUN_APP):
 				{
-					// TODO: also check app checksum? Could store md5 in bbram and verify it before we jump
-
-					std::array<uint8_t, 16> md5_axi = Bootloader_task::calculate_md5_axi_sram();
-
 					if( std::equal(boot_key.app_md5.begin(), boot_key.app_md5.end(), md5_axi.begin()) )
 					{
 						uint32_t app_estack = 0;
