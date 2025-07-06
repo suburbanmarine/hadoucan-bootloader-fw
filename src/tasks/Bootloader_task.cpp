@@ -476,8 +476,7 @@ void Bootloader_task::work()
 				// See 2.4 Embedded SRAM note Error code correction
 				// Write are delayed in the event of a less than ecc sized write
 				// Flush SRAM areas needed to be preserved before resetting
-				ecc_flush_axi_sram();
-				ecc_flush_bbram();
+				ecc_flush_axi_sram(key.app_length);
 				
 				sync_and_reset();
 
@@ -499,7 +498,6 @@ void Bootloader_task::work()
 					// Write are delayed in the event of a less than ecc sized write
 					// Flush SRAM areas needed to be preserved before resetting
 					ecc_flush_axi_sram(key.app_length);
-					ecc_flush_bbram(Bootloader_key::LENGTH_IN_BYTES);
 
 					sync_and_reset();
 
@@ -832,13 +830,20 @@ void Bootloader_task::ecc_flush_axi_sram(const uint32_t length)
 		: "memory"
 	);
 
-	SCB_CleanDCache();
 	SCB_DisableDCache();
 
 	uint64_t tmp;
 	uint64_t volatile* axi_base = reinterpret_cast<uint64_t volatile*>(m_mem_base);
 	tmp = axi_base[length_in_words];
 	axi_base[length_in_words] = tmp;
+
+	asm volatile(
+		"isb sy\n"
+		"dsb sy\n"
+		: /* no out */
+		: /* no in */
+		: "memory"
+	);
 
 	SCB_EnableDCache();
 
@@ -864,10 +869,17 @@ void Bootloader_task::ecc_flush_bbram(const uint32_t length)
 		: "memory"
 	);
 
-	SCB_CleanDCache();
 	SCB_DisableDCache();
 
 	HAL_PWR_EnableBkUpAccess();
+
+	asm volatile(
+		"isb sy\n"
+		"dsb sy\n"
+		: /* no out */
+		: /* no in */
+		: "memory"
+	);
 
 	uint32_t tmp;
 	uint32_t volatile* bbram_base = reinterpret_cast<uint32_t volatile*>(0x38800000);
