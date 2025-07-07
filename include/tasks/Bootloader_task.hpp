@@ -196,9 +196,9 @@ public:
 
 	static void zero_axi_sram();
 
-	static void ecc_flush_axi_sram(const uint32_t length_bytes);
-	static void ecc_flush_bbram(const uint32_t length_bytes);
-	static void ecc_flush_bbram_noisr_noenable(const uint32_t length_bytes);
+	static void ecc_flush_axi_sram(const uint32_t offset);
+	static void ecc_flush_bbram(const uint32_t offset);
+	static void ecc_flush_bbram_noisr_noenable(const uint32_t offset);
 
 	static std::array<uint8_t, 16> calculate_md5_axi_sram(const uint32_t length);
 

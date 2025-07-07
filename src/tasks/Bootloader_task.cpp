@@ -817,9 +817,9 @@ void Bootloader_task::zero_axi_sram()
 	__DSB();
 }
 
-void Bootloader_task::ecc_flush_axi_sram(const uint32_t length)
+void Bootloader_task::ecc_flush_axi_sram(const uint32_t offset)
 {
-	const size_t length_in_words = length / 8UL;
+	const size_t offset_in_words = offset / 8UL;
 
 	asm volatile(
 		"cpsid i\n"
@@ -832,10 +832,9 @@ void Bootloader_task::ecc_flush_axi_sram(const uint32_t length)
 
 	SCB_DisableDCache();
 
-	uint64_t tmp;
-	uint64_t volatile* axi_base = reinterpret_cast<uint64_t volatile*>(m_mem_base);
-	tmp = axi_base[length_in_words];
-	axi_base[length_in_words] = tmp;
+	uint64_t volatile* const axi_base = reinterpret_cast<uint64_t volatile*>(m_mem_base);
+	uint64_t tmp = axi_base[offset_in_words];
+	axi_base[offset_in_words] = tmp;
 
 	asm volatile(
 		"isb sy\n"
@@ -857,9 +856,9 @@ void Bootloader_task::ecc_flush_axi_sram(const uint32_t length)
 	);
 }
 
-void Bootloader_task::ecc_flush_bbram_noisr_noenable(const uint32_t length)
+void Bootloader_task::ecc_flush_bbram_noisr_noenable(const uint32_t offset)
 {
-	const size_t length_in_words = length / 4UL;
+	const size_t offset_in_words = offset / 4UL;
 
 	asm volatile(
 		"isb sy\n"
@@ -871,10 +870,9 @@ void Bootloader_task::ecc_flush_bbram_noisr_noenable(const uint32_t length)
 
 	SCB_DisableDCache();
 
-	uint32_t tmp;
-	uint32_t volatile* bbram_base = reinterpret_cast<uint32_t volatile*>(0x38800000);
-	tmp = bbram_base[length_in_words];
-	bbram_base[length_in_words] = tmp;
+	uint32_t volatile* const bbram_base = reinterpret_cast<uint32_t volatile*>(0x38800000);
+	uint32_t tmp = bbram_base[offset_in_words];
+	bbram_base[offset_in_words] = tmp;
 
 	asm volatile(
 		"isb sy\n"
@@ -887,9 +885,9 @@ void Bootloader_task::ecc_flush_bbram_noisr_noenable(const uint32_t length)
 	SCB_EnableDCache();
 }
 
-void Bootloader_task::ecc_flush_bbram(const uint32_t length)
+void Bootloader_task::ecc_flush_bbram(const uint32_t offset)
 {
-	const size_t length_in_words = length / 4UL;
+	const size_t offset_in_words = offset / 4UL;
 
 	asm volatile(
 		"cpsid i\n"
@@ -912,10 +910,9 @@ void Bootloader_task::ecc_flush_bbram(const uint32_t length)
 		: "memory"
 	);
 
-	uint32_t tmp;
-	uint32_t volatile* bbram_base = reinterpret_cast<uint32_t volatile*>(0x38800000);
-	tmp = bbram_base[length_in_words];
-	bbram_base[length_in_words] = tmp;
+	uint32_t volatile* const bbram_base = reinterpret_cast<uint32_t volatile*>(0x38800000);
+	uint32_t tmp = bbram_base[offset_in_words];
+	bbram_base[offset_in_words] = tmp;
 
 	asm volatile(
 		"isb sy\n"
