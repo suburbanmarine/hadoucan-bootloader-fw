@@ -28,8 +28,8 @@ extern "C"
 		tusb_int_handler(1, true);
 	}
 
-	#define USB_VID   0x0483
-	#define USB_PID   0xDF11
+	#define USB_VID   0x16D0
+	#define USB_PID   0x1454
 	#define USB_BCD   0x0200
 
 	#define EPNUM_CDC_NOTIF   0x81
