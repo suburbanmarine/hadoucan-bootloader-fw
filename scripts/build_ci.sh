@@ -13,9 +13,9 @@ docker stop $CONTAINER_ID
 
 pushd $GITHUB_WORKSPACE/build/flash/debug/
 sha256sum -b stm32h7_qspi_boot.elf stm32h7_qspi_boot.bin | tee sha256.txt
-tar -czf $GITHUB_WORKSPACE/hadoucan-bootloader-fw-debug-flash-$GITHUB_SHA.tar.gz stm32h7_qspi_boot.elf stm32h7_qspi_boot.bin sha256.txt
+tar -czf $GITHUB_WORKSPACE/hadoucan-bootloader-fw-debug-$GITHUB_SHA.tar.gz stm32h7_qspi_boot.elf stm32h7_qspi_boot.bin sha256.txt
 
 pushd $GITHUB_WORKSPACE/build/flash/release/
 sha256sum -b stm32h7_qspi_boot.elf stm32h7_qspi_boot.bin | tee sha256.txt
-tar -czf $GITHUB_WORKSPACE/hadoucan-bootloader-fw-release-flash-$GITHUB_SHA.tar.gz stm32h7_qspi_boot.elf stm32h7_qspi_boot.bin sha256.txt
+tar -czf $GITHUB_WORKSPACE/hadoucan-bootloader-fw-release-$GITHUB_SHA.tar.gz stm32h7_qspi_boot.elf stm32h7_qspi_boot.bin sha256.txt
 popd

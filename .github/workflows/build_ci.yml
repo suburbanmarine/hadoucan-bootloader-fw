@@ -76,13 +76,13 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: hadoucan-bootloader-fw-debug
-        path: ${{ github.workspace }}/hadoucan-bootloader-fw-debug-flash-${{ github.sha }}.tar.gz
+        path: ${{ github.workspace }}/hadoucan-bootloader-fw-debug-${{ github.sha }}.tar.gz
 
     - name: Upload release artifacts
       uses: actions/upload-artifact@v4
       with:
         name: hadoucan-bootloader-fw-release
-        path: ${{ github.workspace }}/hadoucan-bootloader-fw-release-flash-${{ github.sha }}.tar.gz
+        path: ${{ github.workspace }}/hadoucan-bootloader-fw-release-${{ github.sha }}.tar.gz
 
   release:
 
@@ -98,13 +98,13 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: hadoucan-bootloader-fw-release
-        path: ${{ github.workspace }}/hadoucan-bootloader-fw-release-flash-${{ github.sha }}-${{ env.BRANCH_NAME }}
+        path: ${{ github.workspace }}/hadoucan-bootloader-fw-release
 
-    - name: Make archive
-      run: tar -czf ${{ github.workspace }}/hadoucan-bootloader-fw-release-flash-${{ github.sha }}-${{ env.BRANCH_NAME }}.tar.gz hadoucan-bootloader-fw-release-flash-${{ github.sha }}-${{ env.BRANCH_NAME }}
+    - name: Rename archive
+      run: mv ${{ github.workspace }}/hadoucan-bootloader-fw-release/hadoucan-bootloader-fw-release-${{ github.sha }}.tar.gz ${{ github.workspace }}/hadoucan-bootloader-fw-release/hadoucan-bootloader-fw-release-${{ github.sha }}-${{ env.BRANCH_NAME }}.tar.gz
 
     - name: Create release
       uses: actions/upload-artifact@v4
       with:
         name: hadoucan-bootloader-fw-release-${{ github.sha }}-${{ env.BRANCH_NAME }}
-        path: ${{ github.workspace }}/hadoucan-bootloader-fw-release-flash-${{ github.sha }}-${{ env.BRANCH_NAME }}.tar.gz
+        path: ${{ github.workspace }}/hadoucan-bootloader-fw-release/hadoucan-bootloader-fw-release-${{ github.sha }}-${{ env.BRANCH_NAME }}.tar.gz
