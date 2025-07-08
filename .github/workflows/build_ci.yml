@@ -1,9 +1,9 @@
 name: Hadou-CAN Bootloader CI
 
 on: 
-  create:
+  push:
     tags:
-      - '**'
+      - 'release-*'
   push:
     branches:
       - '**'
