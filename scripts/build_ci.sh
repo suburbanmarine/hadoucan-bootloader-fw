@@ -11,10 +11,11 @@ docker exec -u $(id -u):$(id -g) -w /tmp/workspace/ $CONTAINER_ID make -j`nproc`
 docker exec -u $(id -u):$(id -g) -w /tmp/workspace/ $CONTAINER_ID make -j`nproc` -C build/flash/release/
 docker stop $CONTAINER_ID
 
-pushd $GITHUB_WORKSPACE/build/ram/debug/
-ls -la
+pushd $GITHUB_WORKSPACE/build/flash/debug/
+sha256sum -b stm32h7_qspi_boot.elf stm32h7_qspi_boot.bin | tee sha256.txt
+tar -czf $GITHUB_WORKSPACE/stm32h7_qspi_boot-debug-flash-$GITHUB_SHA.tar.gz stm32h7_qspi_boot.elf stm32h7_qspi_boot.bin sha256.txt
 
 pushd $GITHUB_WORKSPACE/build/flash/release/
 sha256sum -b stm32h7_qspi_boot.elf stm32h7_qspi_boot.bin | tee sha256.txt
-tar -czf $GITHUB_WORKSPACE/stm32h7_qspi_boot-release-flash-$GITHUB_SHA.tar.gz  stm32h7_qspi_boot.elf stm32h7_qspi_boot.bin sha256.txt
+tar -czf $GITHUB_WORKSPACE/stm32h7_qspi_boot-release-flash-$GITHUB_SHA.tar.gz stm32h7_qspi_boot.elf stm32h7_qspi_boot.bin sha256.txt
 popd
