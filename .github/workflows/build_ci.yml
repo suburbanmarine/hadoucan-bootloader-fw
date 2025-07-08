@@ -7,14 +7,16 @@ on:
   push:
     branches:
       - '**'
-  pull_request:
-    branches:
-      - '**'
+
 env:
   REGISTRY: ghcr.io
   BRANCH_NAME: ${{ github.head_ref || github.ref_name }} 
   DOCKER_REPO: ghcr.io/${{ github.repository }}/hadoucan-bootloader-fw-ci
   DOCKER_REPO_CACHE: ghcr.io/${{ github.repository }}/hadoucan-bootloader-fw-ci-cache
+
+concurrency:
+  group: ${{ github.repository }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -74,20 +76,14 @@ jobs:
     - name: Upload debug artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: hadoucan-fw-debug-ram
-        path: ${{ github.workspace }}/stm32h7_qspi_boot-debug-ram-${{ github.sha }}.tar.gz
+        name: hadoucan-bootloader-fw-debug
+        path: ${{ github.workspace }}/hadoucan-bootloader-fw-debug-flash-${{ github.sha }}.tar.gz
 
     - name: Upload release artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: hadoucan-fw-release-ram
-        path: ${{ github.workspace }}/stm32h7_qspi_boot-release-ram-${{ github.sha }}.tar.gz
-
-    - name: Upload release artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: hadoucan-fw-release-flash
-        path: ${{ github.workspace }}/stm32h7_qspi_boot-release-flash-${{ github.sha }}.tar.gz
+        name: hadoucan-bootloader-fw-release
+        path: ${{ github.workspace }}/hadoucan-bootloader-fw-release-flash-${{ github.sha }}.tar.gz
 
   release:
 
@@ -102,11 +98,11 @@ jobs:
     - name: Get artifact
       uses: actions/download-artifact@v4
       with:
-        name: hadoucan-fw-release
-        path: ${{ github.workspace }}/stm32h7_qspi_boot-release-${{ github.sha }}.tar.gz
+        name: hadoucan-bootloader-fw-release
+        path: ${{ github.workspace }}/hadoucan-bootloader-fw-release-flash-${{ github.sha }}.tar.gz
 
     - name: Mangle name
-      run: mv stm32h7_qspi_boot-release-${{ github.sha }}.tar.gz stm32h7_qspi_boot-release-${{ github.sha }}-${{ github.event.ref }}.tar.gz
+      run: mv ${{ github.workspace }}/hadoucan-bootloader-fw-release-flash-${{ github.sha }}.tar.gz hadoucan-bootloader-fw-release-flash-${{ github.sha }}-${{ github.event.ref }}.tar.gz
 
     - name: Upload release artifacts
       uses: actions/upload-artifact@v4
