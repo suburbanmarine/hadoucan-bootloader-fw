@@ -77,19 +77,13 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: hadoucan-fw-debug-ram
-        path: ${{ github.workspace }}/stm32h7_qspi_boot-debug-ram-${{ github.sha }}.tar.gz
-
-    - name: Upload release artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: hadoucan-fw-release-ram
-        path: ${{ github.workspace }}/stm32h7_qspi_boot-release-ram-${{ github.sha }}.tar.gz
+        path: ${{ github.workspace }}/hadoucan-bootloader-fw-debug-flash-${{ github.sha }}.tar.gz
 
     - name: Upload release artifacts
       uses: actions/upload-artifact@v4
       with:
         name: hadoucan-fw-release-flash
-        path: ${{ github.workspace }}/stm32h7_qspi_boot-release-flash-${{ github.sha }}.tar.gz
+        path: ${{ github.workspace }}/hadoucan-bootloader-fw-release-flash-${{ github.sha }}.tar.gz
 
   release:
 
