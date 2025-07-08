@@ -76,13 +76,13 @@ jobs:
     - name: Upload debug artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: hadoucan-fw-debug-ram
+        name: hadoucan-bootloader-fw-debug
         path: ${{ github.workspace }}/hadoucan-bootloader-fw-debug-flash-${{ github.sha }}.tar.gz
 
     - name: Upload release artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: hadoucan-fw-release-flash
+        name: hadoucan-bootloader-fw-release
         path: ${{ github.workspace }}/hadoucan-bootloader-fw-release-flash-${{ github.sha }}.tar.gz
 
   release:
@@ -98,11 +98,11 @@ jobs:
     - name: Get artifact
       uses: actions/download-artifact@v4
       with:
-        name: hadoucan-fw-release
-        path: ${{ github.workspace }}/stm32h7_qspi_boot-release-${{ github.sha }}.tar.gz
+        name: hadoucan-bootloader-fw-release
+        path: ${{ github.workspace }}/hadoucan-bootloader-fw-release-flash-${{ github.sha }}.tar.gz
 
     - name: Mangle name
-      run: mv stm32h7_qspi_boot-release-${{ github.sha }}.tar.gz stm32h7_qspi_boot-release-${{ github.sha }}-${{ github.event.ref }}.tar.gz
+      run: mv ${{ github.workspace }}/hadoucan-bootloader-fw-release-flash-${{ github.sha }}.tar.gz hadoucan-bootloader-fw-release-flash-${{ github.sha }}-${{ github.event.ref }}.tar.gz
 
     - name: Upload release artifacts
       uses: actions/upload-artifact@v4
