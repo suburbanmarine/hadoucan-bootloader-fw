@@ -836,6 +836,12 @@ void Bootloader_task::ecc_flush_axi_sram(const uint32_t offset)
 	uint64_t tmp = axi_base[offset_in_words];
 	axi_base[offset_in_words] = tmp;
 
+	if(offset_in_words > 1)
+	{
+		tmp = axi_base[offset_in_words-1];
+		axi_base[offset_in_words-1] = tmp;
+	}
+
 	asm volatile(
 		"isb sy\n"
 		"dsb sy\n"
@@ -873,6 +879,12 @@ void Bootloader_task::ecc_flush_bbram_noisr_noenable(const uint32_t offset)
 	uint32_t volatile* const bbram_base = reinterpret_cast<uint32_t volatile*>(0x38800000);
 	uint32_t tmp = bbram_base[offset_in_words];
 	bbram_base[offset_in_words] = tmp;
+
+	if(offset_in_words > 1)
+	{
+		tmp = bbram_base[offset_in_words-1];
+		bbram_base[offset_in_words-1] = tmp;
+	}
 
 	asm volatile(
 		"isb sy\n"
