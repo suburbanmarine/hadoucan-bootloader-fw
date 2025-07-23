@@ -22,23 +22,32 @@
 class LFS_file : private Non_copyable
 {
 public:
+	LFS_file()
+	{
+		m_fs = nullptr;
+	}
 	LFS_file(LFS_int* const fs)
 	{
 		m_fs = fs;
 	}
 	virtual ~LFS_file()
 	{
-		if(lfs_file_ishandleopen(m_fs->get_fs(), &m_fd) == LFS_ERR_OK)
+		if(m_fs)
 		{
-			if(lfs_file_close(m_fs->get_fs(), &m_fd) < 0)
+			int ret = lfs_file_ishandleopen(m_fs->get_fs(), &m_fd);
+			if(ret == LFS_ERR_OK)
 			{
-				// Log?
+				ret = lfs_file_close(m_fs->get_fs(), &m_fd);
+				if(ret != LFS_ERR_OK)
+				{
+					// Log ?
+				}
 			}
 		}
 	}
 
 	LFS_file(LFS_file&& other)
-	{	
+	{
 		m_fs = other.m_fs;
 		if(lfs_file_ishandleopen(m_fs->get_fs(), &other.m_fd) == LFS_ERR_OK)
 		{
@@ -82,6 +91,11 @@ public:
 
 	int open(const char* path, int flags)
 	{
+		if( ! m_fs )
+		{
+			return -1;
+		}
+
 		if(lfs_file_ishandleopen(m_fs->get_fs(), &m_fd) == LFS_ERR_OK)
 		{
 			return -1;
@@ -94,6 +108,11 @@ public:
 
 	int close()
 	{
+		if( ! m_fs )
+		{
+			return -1;
+		}
+
 		int ret = lfs_file_close(get_fs(), get_fd());
 		return ret;
 	}
