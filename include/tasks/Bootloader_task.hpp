@@ -48,31 +48,40 @@ public:
 
 	LFS_file(LFS_file&& other)
 	{
-		m_fs = other.m_fs;
-		if(lfs_file_ishandleopen(m_fs->get_fs(), &other.m_fd) == LFS_ERR_OK)
+		if(other.m_fs)
 		{
-			if(lfs_file_movehandle(m_fs->get_fs(), &other.m_fd, &m_fd) != LFS_ERR_OK)
+			m_fs = other.m_fs;
+			if(lfs_file_ishandleopen(m_fs->get_fs(), &other.m_fd) == LFS_ERR_OK)
 			{
-				throw std::runtime_error("");
+				if(lfs_file_movehandle(m_fs->get_fs(), &other.m_fd, &m_fd) != LFS_ERR_OK)
+				{
+					throw std::runtime_error("");
+				}
 			}
 		}
 	}
 	LFS_file& operator=(LFS_file&& other)
 	{
-		if(lfs_file_ishandleopen(m_fs->get_fs(), &m_fd) == LFS_ERR_OK)
+		if(m_fs)
 		{
-			if(close() < 0)
+			if(lfs_file_ishandleopen(m_fs->get_fs(), &m_fd) == LFS_ERR_OK)
 			{
-				throw std::runtime_error("");
+				if(close() < 0)
+				{
+					throw std::runtime_error("");
+				}
 			}
 		}
 
 		m_fs = other.m_fs;
-		if(lfs_file_ishandleopen(m_fs->get_fs(), &other.m_fd) == LFS_ERR_OK)
+		if(other.m_fs)
 		{
-			if(lfs_file_movehandle(m_fs->get_fs(), &other.m_fd, &m_fd) != LFS_ERR_OK)
+			if(lfs_file_ishandleopen(m_fs->get_fs(), &other.m_fd) == LFS_ERR_OK)
 			{
-				throw std::runtime_error("");
+				if(lfs_file_movehandle(m_fs->get_fs(), &other.m_fd, &m_fd) != LFS_ERR_OK)
+				{
+					throw std::runtime_error("");
+				}
 			}
 		}
 
