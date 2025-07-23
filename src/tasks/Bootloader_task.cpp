@@ -66,17 +66,20 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 
 	if(block_num == 0)
 	{
-		if( m_fd )
+		if( m_fd.has_value() )
 		{
 			m_fd.reset();
 		}
 
-		m_fd = std::make_shared<LFS_file>(&m_fs);
-		if(m_fd->open("app.bin.tmp", LFS_O_CREAT | LFS_O_TRUNC | LFS_O_RDWR) < 0)
+		LFS_file fd(&m_fs);
+		if(fd.open("app.bin.tmp", LFS_O_CREAT | LFS_O_TRUNC | LFS_O_RDWR) < 0)
 		{
-			m_fd.reset();
 			tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
 			return;
+		}
+		else
+		{
+			m_fd.emplace(std::move(fd));
 		}
 
 		mbedtls_md5_init(&m_fd_md5_ctx);
@@ -87,7 +90,7 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 		}
 	}
 
-	if( ! m_fd )
+	if( ! m_fd.has_value() )
 	{
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
 		return;
@@ -132,9 +135,8 @@ void Bootloader_task::handle_tud_dfu_manifest_cb(uint8_t alt)
 		return;
 	}
 
-	if( ! m_fd )
+	if( ! m_fd.has_value() )
 	{
-		m_fd.reset();
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
 		return;
 	}
@@ -215,20 +217,23 @@ uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_n
 
 	if(block_num == 0)
 	{
-		if( m_fd )
+		if( m_fd.has_value() )
 		{
 			m_fd.reset();
 		}
 
-		m_fd = std::make_shared<LFS_file>(&m_fs);
-		if(m_fd->open("app.bin", LFS_O_RDONLY) < 0)
+		LFS_file fd(&m_fs);
+		if(fd.open("app.bin", LFS_O_RDONLY) < 0)
 		{
-			m_fd.reset();
 			return 0;
+		}
+		else
+		{
+			m_fd.emplace(std::move(fd));
 		}
 	}
 
-	if( ! m_fd )
+	if( ! m_fd.has_value() )
 	{
 		return 0;
 	}

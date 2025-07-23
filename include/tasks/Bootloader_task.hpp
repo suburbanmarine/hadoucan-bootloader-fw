@@ -5,6 +5,8 @@
 
 #include "bootloader_util/Bootloader_key.hpp"
 
+#include "common_util/Non_copyable.hpp"
+
 #include "freertos_cpp_util/Task_static.hpp"
 
 #include <mbedtls/md5.h>
@@ -13,26 +15,41 @@
 
 #include "tusb.h"
 
+#include <stdexcept>
 #include <memory>
+#include <optional>
 
-class LFS_file
+class LFS_file : private Non_copyable
 {
 public:
 	LFS_file(LFS_int* const fs)
 	{
 		m_fs = fs;
+		m_fd = { };
 	}
 	virtual ~LFS_file()
 	{
-		if(m_fd)
+		if(lfs_file_ishandleopen(m_fs->get_fs(), &m_fd) == LFS_ERR_OK)
 		{
-			if(lfs_file_close(m_fs->get_fs(), m_fd.get()) < 0)
+			if(lfs_file_close(m_fs->get_fs(), &m_fd) < 0)
 			{
 				// Log?
 			}
 		}
 
-		m_fd.reset();
+		m_fd = { };
+	}
+
+	LFS_file(LFS_file&& other)
+	{
+		m_fs = other.m_fs;
+		if(lfs_file_ishandleopen(m_fs->get_fs(), &other.m_fd) == LFS_ERR_OK)
+		{
+			if(lfs_file_movehandle(m_fs->get_fs(), &other.m_fd, &m_fd) != LFS_ERR_OK)
+			{
+				throw std::runtime_error("");
+			}
+		}
 	}
 
 	lfs_t* get_fs()
@@ -42,28 +59,17 @@ public:
 
 	lfs_file_t* get_fd()
 	{
-		return m_fd.get();
+		return &m_fd;
 	}
 
 	int open(const char* path, int flags)
 	{
-		if(m_fd)
+		if(lfs_file_ishandleopen(m_fs->get_fs(), &m_fd) == LFS_ERR_OK)
 		{
 			return -1;
 		}
 
-		m_fd = std::make_unique<lfs_file_t>();
-		if( ! m_fd )
-		{
-			return -1;
-		}
-		*m_fd = {};
-
-		int ret = lfs_file_open(get_fs(), get_fd(), path, flags);
-		if(ret < 0)
-		{
-			m_fd.reset();
-		}
+		int ret = lfs_file_open(m_fs->get_fs(), &m_fd, path, flags);
 
 		return ret;
 	}
@@ -71,16 +77,14 @@ public:
 	int close()
 	{
 		int ret = lfs_file_close(get_fs(), get_fd());
-		m_fd.reset();
+		m_fd = { };
 		return ret;
 	}
 
-private:
-	LFS_file(const LFS_file& rhs) = delete;
-	LFS_file& operator=(const LFS_file& rhs) = delete;
+protected:
 
 	LFS_int* m_fs;
-	std::unique_ptr<lfs_file_t> m_fd;
+	lfs_file_t m_fd;
 };
 
 class Bootloader_task : public Task_static<2048>
@@ -215,7 +219,7 @@ protected:
 
 	std::array<char, 25> usb_id_str;
 
-	std::shared_ptr<LFS_file> m_fd;
+	std::optional<LFS_file> m_fd;
 	mbedtls_md5_context m_fd_md5_ctx;
 
 	static uint8_t* const m_mem_base;
