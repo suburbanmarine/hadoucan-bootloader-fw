@@ -25,7 +25,6 @@ public:
 	LFS_file(LFS_int* const fs)
 	{
 		m_fs = fs;
-		m_fd = { };
 	}
 	virtual ~LFS_file()
 	{
@@ -36,12 +35,10 @@ public:
 				// Log?
 			}
 		}
-
-		m_fd = { };
 	}
 
 	LFS_file(LFS_file&& other)
-	{
+	{	
 		m_fs = other.m_fs;
 		if(lfs_file_ishandleopen(m_fs->get_fs(), &other.m_fd) == LFS_ERR_OK)
 		{
@@ -50,6 +47,27 @@ public:
 				throw std::runtime_error("");
 			}
 		}
+	}
+	LFS_file& operator=(LFS_file&& other)
+	{
+		if(lfs_file_ishandleopen(m_fs->get_fs(), &m_fd) == LFS_ERR_OK)
+		{
+			if(close() < 0)
+			{
+				throw std::runtime_error("");
+			}
+		}
+
+		m_fs = other.m_fs;
+		if(lfs_file_ishandleopen(m_fs->get_fs(), &other.m_fd) == LFS_ERR_OK)
+		{
+			if(lfs_file_movehandle(m_fs->get_fs(), &other.m_fd, &m_fd) != LFS_ERR_OK)
+			{
+				throw std::runtime_error("");
+			}
+		}
+
+		return *this;
 	}
 
 	lfs_t* get_fs()
@@ -77,7 +95,6 @@ public:
 	int close()
 	{
 		int ret = lfs_file_close(get_fs(), get_fd());
-		m_fd = { };
 		return ret;
 	}
 
