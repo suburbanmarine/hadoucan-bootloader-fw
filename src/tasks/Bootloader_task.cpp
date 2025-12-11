@@ -60,7 +60,7 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 
 	if(alt != 0)
 	{
-		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_UNKNOWN);
 		return;
 	}
 
@@ -112,7 +112,7 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 
 	if( ! m_fd )
 	{
-		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_UNKNOWN);
 		return;
 	}
 
@@ -151,14 +151,14 @@ void Bootloader_task::handle_tud_dfu_manifest_cb(uint8_t alt)
 	if(alt != 0)
 	{
 		m_fd.reset();
-		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_UNKNOWN);
 		return;
 	}
 
 	if( ! m_fd )
 	{
 		m_fd.reset();
-		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_UNKNOWN);
 		return;
 	}
 
