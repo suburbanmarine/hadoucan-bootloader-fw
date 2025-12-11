@@ -255,13 +255,6 @@ bool Bootloader_task::calc_file_md5(const char* path, std::array<uint8_t, 16>* o
 		return false;
 	}
 
-	lfs_info info;
-	int ret = lfs_stat(m_fs.get_fs(), path, &info);
-	if(ret != LFS_ERR_OK)
-	{
-		return false;
-	}
-
 	std::shared_ptr<mbedtls_md5_helper> md5_ctx = std::make_shared<mbedtls_md5_helper>();
 	mbedtls_md5_init(md5_ctx->get());
 	if(mbedtls_md5_starts_ret(md5_ctx->get()) != 0)
