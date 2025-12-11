@@ -1232,7 +1232,7 @@ bool Bootloader_task::delete_file_if_exists(const char* path)
 	{
 		case LFS_TYPE_DIR:
 		{
-			// TOOD: add recursive option?
+			// TODO: add recursive option?
 			return false;
 		}
 		case LFS_TYPE_REG:
