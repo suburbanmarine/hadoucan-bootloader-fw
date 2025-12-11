@@ -211,6 +211,8 @@ protected:
 
 	bool delete_file_if_exists(const char* path);
 
+	bool calc_file_md5(const char* path, std::array<uint8_t, 16>* out_md5);
+
 	void sync_and_reset();
 	W25Q16JV m_qspi;
 	W25Q16JV_app_region m_fs;

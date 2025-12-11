@@ -171,8 +171,8 @@ void Bootloader_task::handle_tud_dfu_manifest_cb(uint8_t alt)
 	m_fd.reset();
 
 	// Write out the checksum
+	std::array<unsigned char, 16> md5_output;
 	{
-		std::array<unsigned char, 16> md5_output;
 		if(mbedtls_md5_finish_ret(&m_fd_md5_ctx, md5_output.data() ) != 0)
 		{
 			m_fd.reset();
@@ -223,10 +223,80 @@ void Bootloader_task::handle_tud_dfu_manifest_cb(uint8_t alt)
 		return;
 	}
 
+	//TODO: read back app.bin and verify checksum?
+	{
+		std::array<uint8_t, 16> read_back_md5;
+		if( ! calc_file_md5("app.bin", &read_back_md5) )
+		{
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "Firmware readback md5 calc failed");
+
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
+			return;
+		}
+
+		if( ! std::equal(md5_output.begin(), md5_output.end(), read_back_md5.begin(), read_back_md5.end()) )
+		{
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "Firmware readback md5 mismatch");
+
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
+			return;
+		}
+	}
+
 	logger->log(LOG_LEVEL::debug, "Bootloader_task", "New firmware written");
 
 	tud_dfu_finish_flashing(DFU_STATUS_OK);
 }
+
+bool Bootloader_task::calc_file_md5(const char* path, std::array<uint8_t, 16>* out_md5)
+{
+	LFS_file app_file(&m_fs);
+	if(app_file.open(path, LFS_O_RDONLY) < 0)
+	{
+		return false;
+	}
+
+	lfs_info info;
+	int ret = lfs_stat(m_fs.get_fs(), path, &info);
+	if(ret != LFS_ERR_OK)
+	{
+		return false;
+	}
+
+	mbedtls_md5_context md5_ctx;
+	mbedtls_md5_init(&md5_ctx);
+	if(mbedtls_md5_starts_ret(&md5_ctx) != 0)
+	{
+		return false;
+	}
+
+	std::vector<uint8_t> buf;
+	buf.resize(512);
+
+	lfs_ssize_t num_read = 0;
+	do
+	{
+		num_read = lfs_file_read(m_fs.get_fs(), app_file.get_fd(), buf.data(), buf.size());
+		if(num_read < 0)
+		{
+			return false;
+		}
+
+		if(mbedtls_md5_update_ret(&md5_ctx, buf.data(), num_read) != 0)
+		{
+			return false;
+		}
+	} while(num_read > 0);
+
+	if(mbedtls_md5_finish_ret(&md5_ctx, out_md5->data() ) != 0)
+	{
+		return false;
+	}
+	mbedtls_md5_free(&md5_ctx);
+
+	return true;
+}
+
 uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_num, uint8_t* data, uint16_t length)
 {
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
