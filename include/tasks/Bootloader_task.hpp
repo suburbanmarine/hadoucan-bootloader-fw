@@ -209,6 +209,8 @@ protected:
 	bool load_verify_bin_app_image(Bootloader_key* const key);
 	bool load_verify_bin_gcm_app_image();
 
+	bool delete_file_if_exists(const char* path);
+
 	void sync_and_reset();
 	W25Q16JV m_qspi;
 	W25Q16JV_app_region m_fs;

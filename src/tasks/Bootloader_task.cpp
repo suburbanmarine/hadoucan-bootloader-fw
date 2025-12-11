@@ -71,11 +71,34 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 			m_fd.reset();
 		}
 
+		// delete old fw first, in case there is not enough space for a new image
+		// originally, I wanted to do an atomic rename to app.bin to preserve it on failed flash
+		// in practice, this gets wedged if someone fills the flash with a too-large app.bin accidentally
+		{
+			if( ! delete_file_if_exists("app.bin.md5") )
+			{
+				tud_dfu_finish_flashing(DFU_STATUS_ERR_ERASE);
+				return;			
+			}
+
+			if( ! delete_file_if_exists("app.bin.md5.tmp") )
+			{
+				tud_dfu_finish_flashing(DFU_STATUS_ERR_ERASE);
+				return;			
+			}
+
+			if( ! delete_file_if_exists("app.bin") )
+			{
+				tud_dfu_finish_flashing(DFU_STATUS_ERR_ERASE);
+				return;			
+			}
+		}
+
 		m_fd = std::make_shared<LFS_file>(&m_fs);
 		if(m_fd->open("app.bin.tmp", LFS_O_CREAT | LFS_O_TRUNC | LFS_O_RDWR) < 0)
 		{
 			m_fd.reset();
-			tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_ERASE);
 			return;
 		}
 
@@ -98,7 +121,7 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 
 	if((offset + length) > m_mem_size)
 	{
-		tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_ADDRESS);
 		return;
 	}
 
@@ -161,7 +184,7 @@ void Bootloader_task::handle_tud_dfu_manifest_cb(uint8_t alt)
 		LFS_file md5_file(&m_fs);
 		if(md5_file.open("app.bin.md5.tmp", LFS_O_CREAT | LFS_O_TRUNC | LFS_O_RDWR) < 0)
 		{
-			tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_ERASE);
 			return;
 		}
 
@@ -1190,6 +1213,39 @@ void Bootloader_task::get_unique_id_str(std::array<char, 25>* const id_str)
 	get_unique_id(&id);
 
 	snprintf(id_str->data(), id_str->size(), "%08" PRIX32 "%08" PRIX32 "%08" PRIX32, id[0], id[1], id[2]);
+}
+
+bool Bootloader_task::delete_file_if_exists(const char* path)
+{
+	lfs_info info;
+	int ret = lfs_stat(m_fs.get_fs(), path, &info);
+	if(ret == LFS_ERR_NOENT)
+	{
+		return true;
+	}
+	else if(ret != LFS_ERR_OK)
+	{
+		return false;
+	}
+
+	switch(info.type)
+	{
+		case LFS_TYPE_DIR:
+		{
+			// TOOD: add recursive option?
+			return false;
+		}
+		case LFS_TYPE_REG:
+		{
+			ret = lfs_remove(m_fs.get_fs(), path);
+		}
+		default:
+		{
+			return false;
+		}
+	}
+
+	return ret == LFS_ERR_OK;
 }
 
 void Bootloader_task::sync_and_reset()
