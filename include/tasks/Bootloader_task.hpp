@@ -249,7 +249,7 @@ protected:
 	std::shared_ptr<LFS_file> m_fd;
 	std::shared_ptr<mbedtls_md5_helper> m_fd_md5_ctx;
 
-	static uint8_t* const m_mem_base;
+	static uint8_t* const m_axi_mem_base;
 	static constexpr size_t m_mem_size            = 512*1024;
 	static constexpr size_t m_download_block_size = CFG_TUD_DFU_XFER_BUFSIZE;
 

@@ -27,7 +27,7 @@
 
 using freertos_util::logging::LOG_LEVEL;
 
-uint8_t* const Bootloader_task::m_mem_base = reinterpret_cast<uint8_t*>(0x24000000);
+uint8_t* const Bootloader_task::m_axi_mem_base = reinterpret_cast<uint8_t*>(0x24000000);
 
 uint32_t Bootloader_task::handle_tud_dfu_get_timeout_cb(uint8_t alt, uint8_t state)
 {
@@ -125,7 +125,7 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 		return;
 	}
 
-	memcpy(m_mem_base + offset, data, length);
+	memcpy(m_axi_mem_base + offset, data, length);
 
 	if(mbedtls_md5_update_ret(m_fd_md5_ctx->get(), data, length) != 0)
 	{
@@ -657,7 +657,7 @@ bool Bootloader_task::load_verify_bin_app_image(Bootloader_key* const key)
 	std::vector<char> read_buffer;
 	read_buffer.resize(256);
 
-	volatile uint8_t* const axi_base = reinterpret_cast<volatile uint8_t*>(0x24000000);
+	volatile uint8_t* const axi_base = m_axi_mem_base;
 	size_t num_written = 0;
 
 	lfs_ssize_t read_ret = 0;
@@ -803,7 +803,7 @@ bool Bootloader_task::load_verify_bin_gcm_app_image()
 	
 
 	///
-	volatile uint8_t* const axi_base = reinterpret_cast<volatile uint8_t*>(0x24000000);
+	volatile uint8_t* const axi_base = m_axi_mem_base;
 	{
 		mbed_aes128_gcm_dec gcm_dec;
 		gcm_dec.set_key(bootloader_key);//compiled in global
@@ -907,7 +907,7 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 
 void Bootloader_task::zero_axi_sram()
 {
-	uint64_t volatile* const axi_base = reinterpret_cast<uint64_t volatile*>(m_mem_base);
+	uint64_t volatile* const axi_base = reinterpret_cast<uint64_t volatile*>(m_axi_mem_base);
 
 	std::fill_n(axi_base, m_mem_size / 8, 0);
 
@@ -929,7 +929,7 @@ void Bootloader_task::ecc_flush_axi_sram(const uint32_t offset)
 
 	SCB_DisableDCache();
 
-	uint64_t volatile* const axi_base = reinterpret_cast<uint64_t volatile*>(m_mem_base);
+	uint64_t volatile* const axi_base = reinterpret_cast<uint64_t volatile*>(m_axi_mem_base);
 	uint64_t tmp = axi_base[offset_in_words];
 	axi_base[offset_in_words] = tmp;
 
@@ -1047,7 +1047,7 @@ void Bootloader_task::ecc_flush_bbram(const uint32_t offset)
 
 std::array<uint8_t, 16> Bootloader_task::calculate_md5_axi_sram(const uint32_t length)
 {
-	uint8_t* const axi_base = reinterpret_cast<uint8_t*>(m_mem_base);
+	uint8_t* const axi_base = reinterpret_cast<uint8_t*>(m_axi_mem_base);
 
 	std::array<uint8_t, 16> md5_output;
 	
