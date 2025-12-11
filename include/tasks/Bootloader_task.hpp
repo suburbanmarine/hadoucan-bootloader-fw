@@ -83,6 +83,33 @@ private:
 	std::unique_ptr<lfs_file_t> m_fd;
 };
 
+// wrap init and free for RAII
+class mbedtls_md5_helper
+{
+public:
+
+	mbedtls_md5_helper()
+	{
+		mbedtls_md5_init(&ctx);
+	}
+	~mbedtls_md5_helper()
+	{
+		mbedtls_md5_free(&ctx);
+	}
+
+	mbedtls_md5_context* get()
+	{
+		return &ctx;
+	}
+
+	mbedtls_md5_context const * get() const
+	{
+		return &ctx;
+	}
+
+	mbedtls_md5_context ctx;
+};
+
 class Bootloader_task : public Task_static<2048>
 {
 public:
@@ -220,7 +247,7 @@ protected:
 	std::array<char, 25> usb_id_str;
 
 	std::shared_ptr<LFS_file> m_fd;
-	mbedtls_md5_context m_fd_md5_ctx;
+	std::shared_ptr<mbedtls_md5_helper> m_fd_md5_ctx;
 
 	static uint8_t* const m_mem_base;
 	static constexpr size_t m_mem_size            = 512*1024;

@@ -102,8 +102,8 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 			return;
 		}
 
-		mbedtls_md5_init(&m_fd_md5_ctx);
-		if(mbedtls_md5_starts_ret(&m_fd_md5_ctx) != 0)
+		m_fd_md5_ctx = std::make_shared<mbedtls_md5_helper>();
+		if(mbedtls_md5_starts_ret(m_fd_md5_ctx->get()) != 0)
 		{
 			m_fd.reset();
 			tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
@@ -127,7 +127,7 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 
 	memcpy(m_mem_base + offset, data, length);
 
-	if(mbedtls_md5_update_ret(&m_fd_md5_ctx, data, length) != 0)
+	if(mbedtls_md5_update_ret(m_fd_md5_ctx->get(), data, length) != 0)
 	{
 		m_fd.reset();
 		tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
@@ -173,13 +173,12 @@ void Bootloader_task::handle_tud_dfu_manifest_cb(uint8_t alt)
 	// Write out the checksum
 	std::array<unsigned char, 16> md5_output;
 	{
-		if(mbedtls_md5_finish_ret(&m_fd_md5_ctx, md5_output.data() ) != 0)
+		if(mbedtls_md5_finish_ret(m_fd_md5_ctx->get(), md5_output.data() ) != 0)
 		{
 			m_fd.reset();
 			tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
 			return;
 		}
-		mbedtls_md5_free(&m_fd_md5_ctx);
 
 		LFS_file md5_file(&m_fs);
 		if(md5_file.open("app.bin.md5.tmp", LFS_O_CREAT | LFS_O_TRUNC | LFS_O_RDWR) < 0)
@@ -263,9 +262,9 @@ bool Bootloader_task::calc_file_md5(const char* path, std::array<uint8_t, 16>* o
 		return false;
 	}
 
-	mbedtls_md5_context md5_ctx;
-	mbedtls_md5_init(&md5_ctx);
-	if(mbedtls_md5_starts_ret(&md5_ctx) != 0)
+	std::shared_ptr<mbedtls_md5_helper> md5_ctx = std::make_shared<mbedtls_md5_helper>();
+	mbedtls_md5_init(md5_ctx->get());
+	if(mbedtls_md5_starts_ret(md5_ctx->get()) != 0)
 	{
 		return false;
 	}
@@ -282,17 +281,16 @@ bool Bootloader_task::calc_file_md5(const char* path, std::array<uint8_t, 16>* o
 			return false;
 		}
 
-		if(mbedtls_md5_update_ret(&md5_ctx, buf.data(), num_read) != 0)
+		if(mbedtls_md5_update_ret(md5_ctx->get(), buf.data(), num_read) != 0)
 		{
 			return false;
 		}
 	} while(num_read > 0);
 
-	if(mbedtls_md5_finish_ret(&md5_ctx, out_md5->data() ) != 0)
+	if(mbedtls_md5_finish_ret(md5_ctx->get(), out_md5->data() ) != 0)
 	{
 		return false;
 	}
-	mbedtls_md5_free(&md5_ctx);
 
 	return true;
 }
