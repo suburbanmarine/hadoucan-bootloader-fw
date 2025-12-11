@@ -231,9 +231,22 @@ uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_n
 {
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 
-	if(alt != 0)
+	char const * file_name;
+
+	switch(alt)
 	{
-		return 0;
+		case 0:
+		{
+			file_name = "app.bin";
+		}
+		case 1:
+		{
+			file_name = "app.bin.md5";
+		}
+		default:
+		{
+			return 0;
+		}
 	}
 
 	if(block_num == 0)
@@ -244,7 +257,7 @@ uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_n
 		}
 
 		m_fd = std::make_shared<LFS_file>(&m_fs);
-		if(m_fd->open("app.bin", LFS_O_RDONLY) < 0)
+		if(m_fd->open(file_name, LFS_O_RDONLY) < 0)
 		{
 			m_fd.reset();
 			return 0;
