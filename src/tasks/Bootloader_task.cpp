@@ -223,6 +223,7 @@ void Bootloader_task::handle_tud_dfu_manifest_cb(uint8_t alt)
 	}
 
 	//TODO: read back app.bin and verify checksum?
+	if(0)
 	{
 		std::array<uint8_t, 16> read_back_md5;
 		if( ! calc_file_md5("app.bin", &read_back_md5) )
