@@ -106,7 +106,8 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 		if(mbedtls_md5_starts_ret(m_fd_md5_ctx->get()) != 0)
 		{
 			m_fd.reset();
-			tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_UNKNOWN);
+			return;
 		}
 	}
 
@@ -130,7 +131,7 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 	if(mbedtls_md5_update_ret(m_fd_md5_ctx->get(), data, length) != 0)
 	{
 		m_fd.reset();
-		tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_UNKNOWN);
 		return;
 	}
 
