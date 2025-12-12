@@ -44,7 +44,7 @@ extern "C"
 	};
 
 	#define DFU_FUNC_ATTRS (DFU_ATTR_CAN_UPLOAD | DFU_ATTR_CAN_DOWNLOAD | DFU_ATTR_MANIFESTATION_TOLERANT)
-	#define DFU_ALT_COUNT 1
+	#define DFU_ALT_COUNT 2
 
 	#define ITF_NUM_DFU_MODE 0
 	#define ITF_COUNT        1
@@ -110,7 +110,8 @@ extern "C"
 		"Suburban Marine, Inc.",       // 1: Manufacturer
 		"HadouCAN Bootloader",         // 2: Product
 		NULL,                          // 3: SN
-		"FLASH"                        // 4: DFU ALT 0
+		"FLASH",                       // 4: DFU ALT 0
+		"FLASH-MD5"                    // 5: DFU ALT 1
 	};
 
 	void ascii_to_u16le(const size_t len, char const * const in, uint16_t* const out)
