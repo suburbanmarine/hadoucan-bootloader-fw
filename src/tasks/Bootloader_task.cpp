@@ -1291,6 +1291,8 @@ void Bootloader_task::get_unique_id_str(std::array<char, 25>* const id_str)
 
 bool Bootloader_task::delete_file_if_exists(const char* path)
 {
+	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
+
 	lfs_info info;
 	int ret = lfs_stat(m_fs.get_fs(), path, &info);
 	if(ret == LFS_ERR_NOENT)
@@ -1311,7 +1313,13 @@ bool Bootloader_task::delete_file_if_exists(const char* path)
 		}
 		case LFS_TYPE_REG:
 		{
+			logger->log(LOG_LEVEL::debug, "Bootloader_task", "Removing %s", path);
 			ret = lfs_remove(m_fs.get_fs(), path);
+			if(ret != LFS_ERR_OK)
+			{
+				logger->log(LOG_LEVEL::error, "Bootloader_task", "Removing %s failed", path);
+			}
+			break;
 		}
 		default:
 		{
