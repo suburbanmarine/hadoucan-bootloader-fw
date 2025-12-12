@@ -257,9 +257,8 @@ bool Bootloader_task::calc_file_md5(const char* path, std::array<uint8_t, 16>* o
 		return false;
 	}
 
-	std::shared_ptr<mbedtls_md5_helper> md5_ctx = std::make_shared<mbedtls_md5_helper>();
-	mbedtls_md5_init(md5_ctx->get());
-	if(mbedtls_md5_starts_ret(md5_ctx->get()) != 0)
+	mbedtls_md5_helper md5_ctx;
+	if(mbedtls_md5_starts_ret(md5_ctx.get()) != 0)
 	{
 		return false;
 	}
@@ -276,13 +275,13 @@ bool Bootloader_task::calc_file_md5(const char* path, std::array<uint8_t, 16>* o
 			return false;
 		}
 
-		if(mbedtls_md5_update_ret(md5_ctx->get(), buf.data(), num_read) != 0)
+		if(mbedtls_md5_update_ret(md5_ctx.get(), buf.data(), num_read) != 0)
 		{
 			return false;
 		}
 	} while(num_read > 0);
 
-	if(mbedtls_md5_finish_ret(md5_ctx->get(), out_md5->data() ) != 0)
+	if(mbedtls_md5_finish_ret(md5_ctx.get(), out_md5->data() ) != 0)
 	{
 		return false;
 	}
@@ -652,10 +651,8 @@ bool Bootloader_task::load_verify_bin_app_image(Bootloader_key* const key)
 		return false;
 	}
 
-	mbedtls_md5_context md5_ctx;
-	mbedtls_md5_init(&md5_ctx);
-
-	mbedtls_md5_starts_ret(&md5_ctx);
+	mbedtls_md5_helper md5_ctx;
+	mbedtls_md5_starts_ret(md5_ctx.get());
 
 	//256 byte read buffer
 	std::vector<char> read_buffer;
@@ -674,7 +671,7 @@ bool Bootloader_task::load_verify_bin_app_image(Bootloader_key* const key)
 			return false;
 		}
 
-		mbedtls_md5_update_ret(&md5_ctx, (unsigned char*) read_buffer.data(), read_ret);
+		mbedtls_md5_update_ret(md5_ctx.get(), (unsigned char*) read_buffer.data(), read_ret);
 
 		std::copy_n(read_buffer.data(), read_ret, axi_base + num_written);
 		num_written += read_ret;
@@ -690,8 +687,7 @@ bool Bootloader_task::load_verify_bin_app_image(Bootloader_key* const key)
 	logger->log(LOG_LEVEL::info, "Bootloader_task", "File loaded");
 
 	std::array<unsigned char, 16> md5_output;
-	mbedtls_md5_finish_ret(&md5_ctx, md5_output.data() );
-	mbedtls_md5_free(&md5_ctx);
+	mbedtls_md5_finish_ret(md5_ctx.get(), md5_output.data() );
 
 	std::array<char, 33> md5_output_hex;
 	md5_output_hex.back() = '\0';
@@ -1055,12 +1051,10 @@ std::array<uint8_t, 16> Bootloader_task::calculate_md5_axi_sram(const uint32_t l
 
 	std::array<uint8_t, 16> md5_output;
 	
-	mbedtls_md5_context md5_ctx;
-	mbedtls_md5_init(&md5_ctx);
-	mbedtls_md5_starts_ret(&md5_ctx);
-	mbedtls_md5_update_ret(&md5_ctx, axi_base, std::min<size_t>(length, m_mem_size));
-	mbedtls_md5_finish_ret(&md5_ctx, md5_output.data());
-	mbedtls_md5_free(&md5_ctx);
+	mbedtls_md5_helper md5_ctx;
+	mbedtls_md5_starts_ret(md5_ctx.get());
+	mbedtls_md5_update_ret(md5_ctx.get(), axi_base, std::min<size_t>(length, m_mem_size));
+	mbedtls_md5_finish_ret(md5_ctx.get(), md5_output.data());
 
 	return md5_output;
 }
