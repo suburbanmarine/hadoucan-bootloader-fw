@@ -299,10 +299,12 @@ uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_n
 		case 0:
 		{
 			file_name = "app.bin";
+			break;
 		}
 		case 1:
 		{
 			file_name = "app.bin.md5";
+			break;
 		}
 		default:
 		{
