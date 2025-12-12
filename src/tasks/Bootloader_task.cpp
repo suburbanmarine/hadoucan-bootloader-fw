@@ -27,7 +27,7 @@
 
 using freertos_util::logging::LOG_LEVEL;
 
-uint8_t* const Bootloader_task::m_mem_base = reinterpret_cast<uint8_t*>(0x24000000);
+uint8_t* const Bootloader_task::m_axi_mem_base = reinterpret_cast<uint8_t*>(0x24000000);
 
 uint32_t Bootloader_task::handle_tud_dfu_get_timeout_cb(uint8_t alt, uint8_t state)
 {
@@ -60,7 +60,7 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 
 	if(alt != 0)
 	{
-		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_UNKNOWN);
 		return;
 	}
 
@@ -71,25 +71,49 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 			m_fd.reset();
 		}
 
+		// delete old fw first, in case there is not enough space for a new image
+		// originally, I wanted to do an atomic rename to app.bin to preserve it on failed flash
+		// in practice, this gets wedged if someone fills the flash with a too-large app.bin accidentally
+		{
+			if( ! delete_file_if_exists("app.bin.md5") )
+			{
+				tud_dfu_finish_flashing(DFU_STATUS_ERR_ERASE);
+				return;			
+			}
+
+			if( ! delete_file_if_exists("app.bin.md5.tmp") )
+			{
+				tud_dfu_finish_flashing(DFU_STATUS_ERR_ERASE);
+				return;			
+			}
+
+			if( ! delete_file_if_exists("app.bin") )
+			{
+				tud_dfu_finish_flashing(DFU_STATUS_ERR_ERASE);
+				return;			
+			}
+		}
+
 		m_fd = std::make_shared<LFS_file>(&m_fs);
 		if(m_fd->open("app.bin.tmp", LFS_O_CREAT | LFS_O_TRUNC | LFS_O_RDWR) < 0)
 		{
 			m_fd.reset();
-			tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_ERASE);
 			return;
 		}
 
-		mbedtls_md5_init(&m_fd_md5_ctx);
-		if(mbedtls_md5_starts_ret(&m_fd_md5_ctx) != 0)
+		m_fd_md5_ctx = std::make_shared<mbedtls_md5_helper>();
+		if(mbedtls_md5_starts_ret(m_fd_md5_ctx->get()) != 0)
 		{
 			m_fd.reset();
-			tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_UNKNOWN);
+			return;
 		}
 	}
 
 	if( ! m_fd )
 	{
-		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_UNKNOWN);
 		return;
 	}
 
@@ -98,16 +122,16 @@ void Bootloader_task::handle_tud_dfu_download_cb(uint8_t alt, uint16_t block_num
 
 	if((offset + length) > m_mem_size)
 	{
-		tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_ADDRESS);
 		return;
 	}
 
-	memcpy(m_mem_base + offset, data, length);
+	memcpy(m_axi_mem_base + offset, data, length);
 
-	if(mbedtls_md5_update_ret(&m_fd_md5_ctx, data, length) != 0)
+	if(mbedtls_md5_update_ret(m_fd_md5_ctx->get(), data, length) != 0)
 	{
 		m_fd.reset();
-		tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_UNKNOWN);
 		return;
 	}
 
@@ -128,14 +152,14 @@ void Bootloader_task::handle_tud_dfu_manifest_cb(uint8_t alt)
 	if(alt != 0)
 	{
 		m_fd.reset();
-		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_UNKNOWN);
 		return;
 	}
 
 	if( ! m_fd )
 	{
 		m_fd.reset();
-		tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+		tud_dfu_finish_flashing(DFU_STATUS_ERR_UNKNOWN);
 		return;
 	}
 
@@ -148,20 +172,19 @@ void Bootloader_task::handle_tud_dfu_manifest_cb(uint8_t alt)
 	m_fd.reset();
 
 	// Write out the checksum
+	std::array<unsigned char, 16> md5_output;
 	{
-		std::array<unsigned char, 16> md5_output;
-		if(mbedtls_md5_finish_ret(&m_fd_md5_ctx, md5_output.data() ) != 0)
+		if(mbedtls_md5_finish_ret(m_fd_md5_ctx->get(), md5_output.data() ) != 0)
 		{
 			m_fd.reset();
 			tud_dfu_finish_flashing(DFU_STATUS_ERR_WRITE);
 			return;
 		}
-		mbedtls_md5_free(&m_fd_md5_ctx);
 
 		LFS_file md5_file(&m_fs);
 		if(md5_file.open("app.bin.md5.tmp", LFS_O_CREAT | LFS_O_TRUNC | LFS_O_RDWR) < 0)
 		{
-			tud_dfu_finish_flashing(DFU_STATUS_ERR_FILE);
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_ERASE);
 			return;
 		}
 
@@ -200,17 +223,94 @@ void Bootloader_task::handle_tud_dfu_manifest_cb(uint8_t alt)
 		return;
 	}
 
+	//TODO: read back app.bin and verify checksum?
+	if(0)
+	{
+		std::array<uint8_t, 16> read_back_md5;
+		if( ! calc_file_md5("app.bin", &read_back_md5) )
+		{
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "Firmware readback md5 calc failed");
+
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
+			return;
+		}
+
+		if( ! std::equal(md5_output.begin(), md5_output.end(), read_back_md5.begin(), read_back_md5.end()) )
+		{
+			logger->log(LOG_LEVEL::error, "Bootloader_task", "Firmware readback md5 mismatch");
+
+			tud_dfu_finish_flashing(DFU_STATUS_ERR_PROG);
+			return;
+		}
+	}
+
 	logger->log(LOG_LEVEL::debug, "Bootloader_task", "New firmware written");
 
 	tud_dfu_finish_flashing(DFU_STATUS_OK);
 }
+
+bool Bootloader_task::calc_file_md5(const char* path, std::array<uint8_t, 16>* out_md5)
+{
+	LFS_file app_file(&m_fs);
+	if(app_file.open(path, LFS_O_RDONLY) < 0)
+	{
+		return false;
+	}
+
+	mbedtls_md5_helper md5_ctx;
+	if(mbedtls_md5_starts_ret(md5_ctx.get()) != 0)
+	{
+		return false;
+	}
+
+	std::vector<uint8_t> buf;
+	buf.resize(512);
+
+	lfs_ssize_t num_read = 0;
+	do
+	{
+		num_read = lfs_file_read(m_fs.get_fs(), app_file.get_fd(), buf.data(), buf.size());
+		if(num_read < 0)
+		{
+			return false;
+		}
+
+		if(mbedtls_md5_update_ret(md5_ctx.get(), buf.data(), num_read) != 0)
+		{
+			return false;
+		}
+	} while(num_read > 0);
+
+	if(mbedtls_md5_finish_ret(md5_ctx.get(), out_md5->data() ) != 0)
+	{
+		return false;
+	}
+
+	return true;
+}
+
 uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_num, uint8_t* data, uint16_t length)
 {
 	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
 
-	if(alt != 0)
+	char const * file_name;
+
+	switch(alt)
 	{
-		return 0;
+		case 0:
+		{
+			file_name = "app.bin";
+			break;
+		}
+		case 1:
+		{
+			file_name = "app.bin.md5";
+			break;
+		}
+		default:
+		{
+			return 0;
+		}
 	}
 
 	if(block_num == 0)
@@ -221,7 +321,7 @@ uint16_t Bootloader_task::handle_tud_dfu_upload_cb(uint8_t alt, uint16_t block_n
 		}
 
 		m_fd = std::make_shared<LFS_file>(&m_fs);
-		if(m_fd->open("app.bin", LFS_O_RDONLY) < 0)
+		if(m_fd->open(file_name, LFS_O_RDONLY) < 0)
 		{
 			m_fd.reset();
 			return 0;
@@ -551,16 +651,14 @@ bool Bootloader_task::load_verify_bin_app_image(Bootloader_key* const key)
 		return false;
 	}
 
-	mbedtls_md5_context md5_ctx;
-	mbedtls_md5_init(&md5_ctx);
-
-	mbedtls_md5_starts_ret(&md5_ctx);
+	mbedtls_md5_helper md5_ctx;
+	mbedtls_md5_starts_ret(md5_ctx.get());
 
 	//256 byte read buffer
 	std::vector<char> read_buffer;
 	read_buffer.resize(256);
 
-	volatile uint8_t* const axi_base = reinterpret_cast<volatile uint8_t*>(0x24000000);
+	volatile uint8_t* const axi_base = m_axi_mem_base;
 	size_t num_written = 0;
 
 	lfs_ssize_t read_ret = 0;
@@ -573,7 +671,7 @@ bool Bootloader_task::load_verify_bin_app_image(Bootloader_key* const key)
 			return false;
 		}
 
-		mbedtls_md5_update_ret(&md5_ctx, (unsigned char*) read_buffer.data(), read_ret);
+		mbedtls_md5_update_ret(md5_ctx.get(), (unsigned char*) read_buffer.data(), read_ret);
 
 		std::copy_n(read_buffer.data(), read_ret, axi_base + num_written);
 		num_written += read_ret;
@@ -589,8 +687,7 @@ bool Bootloader_task::load_verify_bin_app_image(Bootloader_key* const key)
 	logger->log(LOG_LEVEL::info, "Bootloader_task", "File loaded");
 
 	std::array<unsigned char, 16> md5_output;
-	mbedtls_md5_finish_ret(&md5_ctx, md5_output.data() );
-	mbedtls_md5_free(&md5_ctx);
+	mbedtls_md5_finish_ret(md5_ctx.get(), md5_output.data() );
 
 	std::array<char, 33> md5_output_hex;
 	md5_output_hex.back() = '\0';
@@ -706,7 +803,7 @@ bool Bootloader_task::load_verify_bin_gcm_app_image()
 	
 
 	///
-	volatile uint8_t* const axi_base = reinterpret_cast<volatile uint8_t*>(0x24000000);
+	volatile uint8_t* const axi_base = m_axi_mem_base;
 	{
 		mbed_aes128_gcm_dec gcm_dec;
 		gcm_dec.set_key(bootloader_key);//compiled in global
@@ -810,7 +907,7 @@ void Bootloader_task::jump_to_addr(uint32_t estack, uint32_t jump_addr)
 
 void Bootloader_task::zero_axi_sram()
 {
-	uint64_t volatile* const axi_base = reinterpret_cast<uint64_t volatile*>(m_mem_base);
+	uint64_t volatile* const axi_base = reinterpret_cast<uint64_t volatile*>(m_axi_mem_base);
 
 	std::fill_n(axi_base, m_mem_size / 8, 0);
 
@@ -832,7 +929,7 @@ void Bootloader_task::ecc_flush_axi_sram(const uint32_t offset)
 
 	SCB_DisableDCache();
 
-	uint64_t volatile* const axi_base = reinterpret_cast<uint64_t volatile*>(m_mem_base);
+	uint64_t volatile* const axi_base = reinterpret_cast<uint64_t volatile*>(m_axi_mem_base);
 	uint64_t tmp = axi_base[offset_in_words];
 	axi_base[offset_in_words] = tmp;
 
@@ -950,16 +1047,14 @@ void Bootloader_task::ecc_flush_bbram(const uint32_t offset)
 
 std::array<uint8_t, 16> Bootloader_task::calculate_md5_axi_sram(const uint32_t length)
 {
-	uint8_t* const axi_base = reinterpret_cast<uint8_t*>(m_mem_base);
+	uint8_t* const axi_base = reinterpret_cast<uint8_t*>(m_axi_mem_base);
 
 	std::array<uint8_t, 16> md5_output;
 	
-	mbedtls_md5_context md5_ctx;
-	mbedtls_md5_init(&md5_ctx);
-	mbedtls_md5_starts_ret(&md5_ctx);
-	mbedtls_md5_update_ret(&md5_ctx, axi_base, std::min<size_t>(length, m_mem_size));
-	mbedtls_md5_finish_ret(&md5_ctx, md5_output.data());
-	mbedtls_md5_free(&md5_ctx);
+	mbedtls_md5_helper md5_ctx;
+	mbedtls_md5_starts_ret(md5_ctx.get());
+	mbedtls_md5_update_ret(md5_ctx.get(), axi_base, std::min<size_t>(length, m_mem_size));
+	mbedtls_md5_finish_ret(md5_ctx.get(), md5_output.data());
 
 	return md5_output;
 }
@@ -1190,6 +1285,47 @@ void Bootloader_task::get_unique_id_str(std::array<char, 25>* const id_str)
 	get_unique_id(&id);
 
 	snprintf(id_str->data(), id_str->size(), "%08" PRIX32 "%08" PRIX32 "%08" PRIX32, id[0], id[1], id[2]);
+}
+
+bool Bootloader_task::delete_file_if_exists(const char* path)
+{
+	freertos_util::logging::Logger* const logger = freertos_util::logging::Global_logger::get();
+
+	lfs_info info;
+	int ret = lfs_stat(m_fs.get_fs(), path, &info);
+	if(ret == LFS_ERR_NOENT)
+	{
+		return true;
+	}
+	else if(ret != LFS_ERR_OK)
+	{
+		return false;
+	}
+
+	switch(info.type)
+	{
+		case LFS_TYPE_DIR:
+		{
+			// TODO: add recursive option?
+			return false;
+		}
+		case LFS_TYPE_REG:
+		{
+			logger->log(LOG_LEVEL::debug, "Bootloader_task", "Removing %s", path);
+			ret = lfs_remove(m_fs.get_fs(), path);
+			if(ret != LFS_ERR_OK)
+			{
+				logger->log(LOG_LEVEL::error, "Bootloader_task", "Removing %s failed", path);
+			}
+			break;
+		}
+		default:
+		{
+			return false;
+		}
+	}
+
+	return ret == LFS_ERR_OK;
 }
 
 void Bootloader_task::sync_and_reset()
